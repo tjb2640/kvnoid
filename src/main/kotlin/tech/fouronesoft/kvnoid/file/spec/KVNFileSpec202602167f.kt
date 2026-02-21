@@ -2,8 +2,11 @@ package tech.fouronesoft.kvnoid.file.spec
 
 import tech.fouronesoft.kvnoid.encryption.AESGCMKey
 import tech.fouronesoft.kvnoid.file.DecryptedKVNData
+import tech.fouronesoft.kvnoid.file.spec.pieces.KVNHeader
 import java.io.BufferedInputStream
-import java.nio.charset.StandardCharsets
+import java.io.BufferedOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
 import kotlin.time.Instant
 
@@ -43,7 +46,9 @@ import kotlin.time.Instant
 class KVNFileSpec202602167f {
   companion object {
     const val VERSION_STRING: String = "202602167f"
+    val VERSION_BYTES: ByteArray = KVNHeader.versionStringToBytes(VERSION_STRING)
     const val NULL_BYTE: Byte = 0x00.toByte()
+    const val PAD_SIZE: Int = 4
     const val BYTELIMIT_CATEGORY: Int = 256
     const val BYTELIMIT_NAMETAG: Int = 512
     const val BYTELIMIT_KEYDATA: Int = 2048
@@ -68,9 +73,9 @@ class KVNFileSpec202602167f {
         }
       }
 
-      // Consume n bytes and verify all are null
-      val verifyNullPadding: ((Int) -> Unit) = { n: Int ->
-        val maybeNull = ByteArray(n)
+      // Consume $PAD_SIZE bytes and verify all are null
+      val verifyNullPadding = fun() {
+        val maybeNull = ByteArray(PAD_SIZE)
         restOfFile.read(maybeNull)
         maybeNull.forEach { b ->
           b.takeIf { NULL_BYTE == b } ?: throw RuntimeException("Nonnull byte in padded region") // TODO
@@ -90,21 +95,21 @@ class KVNFileSpec202602167f {
       val lenEncryptedV: Int = readIntFromStream()
       // Skip 52 reserved bytes
       restOfFile.skipNBytes(52L)
-      // Padding 4x \0?
-      verifyNullPadding(4)
+      // Padding $PAD_SIZEx \0?
+      verifyNullPadding()
 
       // Should be done with header now - body
-      val strCategory: String = restOfFile.readNBytes(lenCategory).toString(StandardCharsets.UTF_8)
-      verifyNullPadding(4)
-      val strNametag: String = restOfFile.readNBytes(lenNametag).toString(StandardCharsets.UTF_8)
-      verifyNullPadding(4)
+      val strCategory: String = restOfFile.readNBytes(lenCategory).toString(Charsets.UTF_8)
+      verifyNullPadding()
+      val strNametag: String = restOfFile.readNBytes(lenNametag).toString(Charsets.UTF_8)
+      verifyNullPadding()
       val keyData: AESGCMKey = AESGCMKey.fromSerializedBytes(passphrase, restOfFile.readNBytes(lenKeyBytes))
-      verifyNullPadding(4)
+      verifyNullPadding()
       val bytesEncryptedK: ByteArray = restOfFile.readNBytes(lenEncryptedK)
-      verifyNullPadding(4)
+      verifyNullPadding()
       val bytesEncryptedV: ByteArray = restOfFile.readNBytes(lenEncryptedV)
-      verifyNullPadding(4)
-      // There will be more bytes after this but as long as we hit 4x\0 here it's fine
+      verifyNullPadding()
+      // There will be more bytes after this but as long as we hit $PAD_SIZEx\0 here it's fine
 
       return DecryptedKVNData(
         uuid = UUID.randomUUID(),
@@ -114,9 +119,93 @@ class KVNFileSpec202602167f {
         category = strCategory,
         nametag = strNametag,
         keyData = keyData,
-        decryptedK = keyData.decrypt(bytesEncryptedK).toString(StandardCharsets.UTF_8),
-        decryptedV = keyData.decrypt(bytesEncryptedV).toString(StandardCharsets.UTF_8)
+        decryptedK = keyData.decrypt(bytesEncryptedK).toString(Charsets.UTF_8),
+        decryptedV = keyData.decrypt(bytesEncryptedV).toString(Charsets.UTF_8)
       )
+    }
+
+    fun writeToDisk(
+        contents: DecryptedKVNData,
+        writer: BufferedOutputStream) {
+
+      require(contents.keyData != null) { "Key data was not initialized" }
+      require(contents.decryptedK != null) { "No key to encrypt" }
+      require(contents.decryptedV != null) { "No value to encrypt" }
+
+      // This should intuitively be pre-known but dynamically calculate anyway
+      val serializedKeyBytes: ByteArray = contents.keyData!!.serializeToBytes()
+
+      // Go ahead and encrypt K and V here
+      val encryptedK: ByteArray = contents.keyData!!.encrypt(contents.decryptedK!!.toByteArray(Charsets.UTF_8))
+      val encryptedV: ByteArray = contents.keyData!!.encrypt(contents.decryptedV!!.toByteArray(Charsets.UTF_8))
+
+      // Lengths (ints) as specified in the header spec
+      val lenCategory: Int = contents.category.length
+      val lenNametag: Int = contents.nametag.length
+      val lenKeyBytes: Int = serializedKeyBytes.size
+      val lenEK: Int = encryptedK.size
+      val lenEV: Int = encryptedV.size
+
+      // Calc lengths of both sections
+      val lenHeader = KVNHeader.KVNFILE_SIZE_HEADER_MAGIC +
+          VERSION_BYTES.size +
+          (2 * 8)   // MS dates (longs)
+          24 +      // Reserved 52
+          (5 * 4) + // All written length values (ints)
+          52 +      // Reserved 53
+          PAD_SIZE
+      val lenBody = lenCategory +
+          lenNametag +
+          lenKeyBytes +
+          lenEK +
+          lenEV +
+          (5 * PAD_SIZE)
+
+      // Commonplace things
+      val bytesPadding = ByteArray(PAD_SIZE)
+
+      val intBuf = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+      val writeInt: ((Int) -> Unit) = fun(z) {
+        writer.write(intBuf.apply { putInt(z) }.array())
+      }
+
+      val longBuf = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+      val writeLong: ((Long) -> Unit) = fun(l) {
+        writer.write(longBuf.apply { putLong(l) }.array())
+      }
+
+      val writePadding: (() -> Unit) = fun() {
+        writer.write(bytesPadding)
+      }
+
+      // Header content
+      writer.write(KVNHeader.KVNFILE_HEADER_MAGIC)
+      writer.write(VERSION_BYTES)
+      writeLong(contents.dateCreated.toEpochMilliseconds())
+      writeLong(contents.dateModified!!.toEpochMilliseconds())
+      writer.write(ByteArray(24)) // Reserved
+      writeInt(lenCategory)
+      writeInt(lenNametag)
+      writeInt(lenKeyBytes)
+      writeInt(lenEK)
+      writeInt(lenEV)
+      writer.write(ByteArray(52)) // Reserved
+      writer.write(bytesPadding)
+
+      // Body content
+      writer.write(contents.category.toByteArray(Charsets.UTF_8))
+      writePadding()
+      writer.write(contents.nametag.toByteArray(Charsets.UTF_8))
+      writePadding()
+      writer.write(serializedKeyBytes)
+      writePadding()
+      writer.write(encryptedK)
+      writePadding()
+      writer.write(encryptedV)
+      writePadding()
+      if ((lenHeader + lenBody) % 4 != 0) { writer.write(ByteArray((lenHeader + lenBody) % 4)) }
+
+      writer.flush()
     }
   }
 }
