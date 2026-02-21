@@ -7,25 +7,35 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.util.UUID
+import kotlin.time.Clock
 import kotlin.time.Instant
 
-class DecryptedKVNData(
-  val uuid: UUID?,
+data class DecryptedKVNData(
+  var uuid: UUID?,
   val versionString: String,
   val dateCreated: Instant,
-  val dateModified: Instant?,
+  var dateModified: Instant?,
   val category: String,
   val nametag: String,
-  val keyData: AESGCMKey?,
-  val decryptedK: String?,
-  val decryptedV: String?,
+  var keyData: AESGCMKey?,
+  var decryptedK: String?,
+  var decryptedV: String?,
 ) {
 
   fun writeToDisk(absPath: String, passphrase: String) {
-    var f: File
+    // Make sure we have initialized properties marked as "mutable" (I'd rather have none mutable)
+    // TODO maybe tighten that up later
+    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
+    this.decryptedK = this.decryptedK ?: ""
+    this.decryptedV = this.decryptedV ?: ""
+    this.dateModified = Clock.System.now()
+
     try {
       BufferedOutputStream(File(absPath).outputStream()).use { writer ->
-        // TODO
+        when (this.versionString.subSequence(0..7)) {
+          "20260216" -> KVNFileSpec202602167f.writeToDisk(this, writer)
+          else -> throw RuntimeException("Unable to read version ${this.versionString}")
+        }
       }
     } catch (e: Exception) {
       // TODO
@@ -34,7 +44,7 @@ class DecryptedKVNData(
   }
 
   companion object {
-    fun fromAbsolutePath(absPath: String, passphrase: String): DecryptedKVNData? {
+    fun readFromAbsolutePath(absPath: String, passphrase: String): DecryptedKVNData? {
       // We only care here about the magic bytes and version (always 7b and 5b respectively)
       val headerBytesMagic = ByteArray(KVNHeader.KVNFILE_SIZE_HEADER_MAGIC)
       val headerBytesVersion = ByteArray(KVNHeader.KVNFILE_SIZE_HEADER_VERSION)
@@ -52,7 +62,7 @@ class DecryptedKVNData(
             "20260216" -> return KVNFileSpec202602167f.parseFromBytes(
               restOfFile = reader,
               passphrase = passphrase)
-            else -> throw RuntimeException("Unable to read file version $headerStringVersion")
+            else -> throw RuntimeException("Unable to read version $headerStringVersion")
           }
         }
       } catch (e: Exception) {
