@@ -1,5 +1,7 @@
 package tech.fouronesoft.kvnoid.encryption
 
+import tech.fouronesoft.kvnoid.util.DataSerializationUtils
+import tech.fouronesoft.kvnoid.util.DataSerializationUtils.Companion.STANDARD_CHARSET
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.SecureRandom
@@ -11,35 +13,51 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * javax crypto wrapper using AES-256-GCM with a passphrase to generate or load keys.
+ * Locked to AES-256-GCM.
+ *
+ * Right now I am not doing anything special with the AAD. TODO
  */
-class AESGCMKey(val secretKey: SecretKeySpec, val salt: ByteArray, val iv: ByteArray, val aad: ByteArray) {
+class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteArray, val aad: ByteArray) {
 
   companion object {
-    const val TAG_SIZE_BITS = 128
+    const val AAD_SIZE_BITS = 128
     const val KEY_SIZE_BITS = 256
     const val SALT_SIZE_BITS = KEY_SIZE_BITS
     const val IV_SIZE_BITS = 12 * 8
     const val ALGO_XFORM_STRING = "AES/GCM/NoPadding"
 
-    fun fromKnownKeyData(passphrase: String, salt: ByteArray, iv: ByteArray, aad: ByteArray): AESGCMKey {
+    /**
+     * Builds a usable AES key given pre-known GCM key data.
+     *
+     * @param passphrase used to generate the key
+     * @param iv of size IV_SIZE_BITS / 8
+     * @param salt of size SALT_SIZE_BITS / 8
+     * @param aad of size AAD_SIZE_BITS / 8
+     */
+    fun fromKnownKeyData(passphrase: String, iv: ByteArray, salt: ByteArray, aad: ByteArray): AESGCMKey {
       val spec = PBEKeySpec(passphrase.toCharArray(), salt, 65536, KEY_SIZE_BITS)
       val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
       val keyBytes = factory.generateSecret(spec).encoded
 
       return AESGCMKey(
         secretKey = SecretKeySpec(keyBytes, "AES"),
-        salt = salt,
         iv = iv,
+        salt = salt,
         aad = aad
       )
     }
 
+    /**
+     * Generates a new key given an already-known passphrase.
+     *
+     * @param passphrase used to generate the key
+     */
     fun fromNewPlaintextPassphrase(passphrase: String): AESGCMKey {
       val secureRandom: SecureRandom = SecureRandom.getInstanceStrong()
-      val salt = ByteArray(SALT_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
       val iv = ByteArray(IV_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
-      val aad = ByteArray(TAG_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
-      return fromKnownKeyData(passphrase, salt, iv, aad)
+      val salt = ByteArray(SALT_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
+      val aad = ByteArray(AAD_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
+      return fromKnownKeyData(passphrase, iv, salt, aad)
     }
 
     /**
@@ -48,17 +66,17 @@ class AESGCMKey(val secretKey: SecretKeySpec, val salt: ByteArray, val iv: ByteA
      * TODO ^
      *
      * @param passphrase: key passphrase to initialize with
-     * @param bytes: key data in packed bytes - should be salt, AAD tag, then IV
+     * @param bytes: key data in packed bytes - should be IV, salt, then AAD
      */
     fun fromSerializedBytes(passphrase: String, bytes: ByteArray): AESGCMKey {
       val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-      val salt = ByteArray(SALT_SIZE_BITS / 8)
-      val aad = ByteArray(TAG_SIZE_BITS / 8)
       val iv = ByteArray(IV_SIZE_BITS / 8)
-      buf.get(salt)
+      val salt = ByteArray(SALT_SIZE_BITS / 8)
+      val aad = ByteArray(AAD_SIZE_BITS / 8)
       buf.get(iv)
+      buf.get(salt)
       buf.get(aad)
-      return fromKnownKeyData(passphrase, salt, iv, aad)
+      return fromKnownKeyData(passphrase, iv, salt, aad)
     }
   }
 
@@ -72,7 +90,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val salt: ByteArray, val iv: ByteA
     cipher.init(
       Cipher.ENCRYPT_MODE,
       this.secretKey,
-      GCMParameterSpec(TAG_SIZE_BITS, this.iv))
+      GCMParameterSpec(AAD_SIZE_BITS, this.iv))
     cipher.updateAAD(this.aad)
     return cipher.doFinal(plaintext)
   }
@@ -87,37 +105,19 @@ class AESGCMKey(val secretKey: SecretKeySpec, val salt: ByteArray, val iv: ByteA
     cipher.init(
       Cipher.DECRYPT_MODE,
       this.secretKey,
-      GCMParameterSpec(TAG_SIZE_BITS, this.iv))
+      GCMParameterSpec(AAD_SIZE_BITS, this.iv))
     cipher.updateAAD(this.aad)
     return cipher.doFinal(ciphertext)
   }
 
+  fun decryptToUTF8String(ciphertext: ByteArray): String {
+    return decrypt(ciphertext).toString(STANDARD_CHARSET)
+  }
+
   fun serializeToBytes(): ByteArray {
-    val buf = ByteBuffer.allocate((SALT_SIZE_BITS + IV_SIZE_BITS + TAG_SIZE_BITS) / 8).order(ByteOrder.LITTLE_ENDIAN)
-    buf.put(this.salt).put(this.iv).put(this.aad)
+    val buf = ByteBuffer.allocate((SALT_SIZE_BITS + IV_SIZE_BITS + AAD_SIZE_BITS) / 8).order(DataSerializationUtils.STANDARD_BYTE_ORDER)
+    buf.put(this.iv).put(this.salt).put(this.aad)
     return buf.array()
-  }
-
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (javaClass != other?.javaClass) return false
-
-    other as AESGCMKey
-
-    if (secretKey != other.secretKey) return false
-    if (!iv.contentEquals(other.iv)) return false
-    if (!salt.contentEquals(other.salt)) return false
-    if (!aad.contentEquals(other.aad)) return false
-
-    return true
-  }
-
-  override fun hashCode(): Int {
-    var result = secretKey.hashCode()
-    result = 31 * result + iv.contentHashCode()
-    result = 31 * result + salt.contentHashCode()
-    result = 31 * result + aad.contentHashCode()
-    return result
   }
 
 }
