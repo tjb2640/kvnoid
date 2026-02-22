@@ -166,11 +166,13 @@ class KVNFileSpec202602167f {
 
       val intBuf = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
       val writeInt: ((Int) -> Unit) = fun(z) {
+        intBuf.rewind()
         writer.write(intBuf.apply { putInt(z) }.array())
       }
 
       val longBuf = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
       val writeLong: ((Long) -> Unit) = fun(l) {
+        longBuf.rewind()
         writer.write(longBuf.apply { putLong(l) }.array())
       }
 
