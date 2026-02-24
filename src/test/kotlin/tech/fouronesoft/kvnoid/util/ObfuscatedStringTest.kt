@@ -33,14 +33,14 @@ class ObfuscatedStringTest {
   @Test
   fun test_constructor_overwritesSourceArray() {
     val initialArray: ByteArray = "abcde".toByteArray(Charsets.UTF_8)
-    ObfuscatedString(initialValue = initialArray)
+    ObfuscatedString(initialValue = initialArray, overwriteInitialValueSource = true)
     assertContentEquals(ByteArray(5), initialArray)
   }
 
   @Test
   fun test_constructor_preservesSourceArray() {
     val initialArray: ByteArray = "abcde".toByteArray(Charsets.UTF_8)
-    ObfuscatedString(initialValue = initialArray, overwriteInitialValueSource = false)
+    ObfuscatedString(initialValue = initialArray)
     assertContentEquals("abcde".toByteArray(Charsets.UTF_8), initialArray)
   }
 
@@ -48,7 +48,7 @@ class ObfuscatedStringTest {
   fun test_setValue_overwritesSourceArray() {
     val obfuscatedString = ObfuscatedString()
     val initialArray: ByteArray = "abcde".toByteArray(Charsets.UTF_8)
-    obfuscatedString.setValue(newValue = initialArray)
+    obfuscatedString.setValue(newValue = initialArray, overwrite = true)
 
     assertContentEquals(ByteArray(5), initialArray)
     obfuscatedString.getProvider().use { provider ->
@@ -60,7 +60,7 @@ class ObfuscatedStringTest {
   fun test_setValue_preservesSourceArray() {
     val obfuscatedString = ObfuscatedString()
     val initialArray: ByteArray = "abcde".toByteArray(Charsets.UTF_8)
-    obfuscatedString.setValue(newValue = initialArray, overwrite = false)
+    obfuscatedString.setValue(newValue = initialArray)
     assertContentEquals("abcde".toByteArray(Charsets.UTF_8), initialArray)
   }
 

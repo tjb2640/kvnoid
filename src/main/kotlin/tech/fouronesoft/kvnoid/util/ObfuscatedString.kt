@@ -7,7 +7,7 @@ import tech.fouronesoft.kvnoid.encryption.AESGCMKey
  */
 class ObfuscatedString(
   initialValue: ByteArray = ByteArray(1),
-  overwriteInitialValueSource: Boolean = true,
+  overwriteInitialValueSource: Boolean = false,
 ) {
 
   private val encryptionKey: AESGCMKey = AESGCMKey.temporaryKey(size = 128)
@@ -21,10 +21,10 @@ class ObfuscatedString(
    * Store a new obfuscated value.
    *
    * @param newValue to store
-   * @param overwrite if newValue should be zeroed out after consumption (default `true`)
+   * @param overwrite if newValue should be zeroed out after consumption (default `false`)
    * @return this ObfuscatedString instance
    */
-  fun setValue(newValue: ByteArray, overwrite: Boolean = true): ObfuscatedString {
+  fun setValue(newValue: ByteArray, overwrite: Boolean = false): ObfuscatedString {
     this.value = this.encryptionKey.encrypt(newValue)
     if (overwrite)
       for (i in 0..<newValue.size) newValue[i] = 0.toByte()
