@@ -21,7 +21,7 @@ class KVNFileSpec202602167fTest {
   // Ensure we use the same key between tests
   class GeneratedTestKey private constructor() {
     companion object {
-      const val PASSPHRASE: String = "test"
+      val PASSPHRASE: CharArray = "test".toCharArray()
       val instance: AESGCMKey by lazy { AESGCMKey.fromNewPlaintextPassphrase(PASSPHRASE) }
     }
   }
@@ -47,28 +47,6 @@ class KVNFileSpec202602167fTest {
 
     loadedKVNData.keyData = null
     assertThrows<RuntimeException>("Should throw on null keyData") {
-      KVNFileSpec202602167f.writeToDisk(loadedKVNData, fakeOutputStream)
-    }
-  }
-
-  @Test
-  fun test_companion_writeToDisk_throwOnNullDecryptedK() {
-    val loadedKVNData: LoadedKVNData = generateDecryptedKVNData()
-    val fakeOutputStream = BufferedOutputStream(BufferedOutputStream.nullOutputStream())
-
-    loadedKVNData.decryptedK = null
-    assertThrows<RuntimeException>("Should throw on a null decryptedK value") {
-      KVNFileSpec202602167f.writeToDisk(loadedKVNData, fakeOutputStream)
-    }
-  }
-
-  @Test
-  fun test_companion_writeToDisk_throwOnNullDecryptedV() {
-    val loadedKVNData: LoadedKVNData = generateDecryptedKVNData()
-    val fakeOutputStream = BufferedOutputStream(BufferedOutputStream.nullOutputStream())
-
-    loadedKVNData.decryptedV = null
-    assertThrows<RuntimeException>("Should throw on a null decryptedV value") {
       KVNFileSpec202602167f.writeToDisk(loadedKVNData, fakeOutputStream)
     }
   }
@@ -119,10 +97,10 @@ class KVNFileSpec202602167fTest {
       loadedKVNData.keyData!!.serializeToBytes().size,
       lenKeyData)
     assertEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK!!)).size,
+      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK)).size,
       lenEncryptedK)
     assertEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV!!)).size,
+      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV)).size,
       lenEncryptedV)
 
     // Trailing reserved bytes should also be null; also test null padding (4B)
@@ -144,11 +122,11 @@ class KVNFileSpec202602167fTest {
       outputReader.readNBytes(lenKeyData))
     assertHasNullPaddingHere()
     assertContentEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK!!)),
+      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK)),
       outputReader.readNBytes(lenEncryptedK))
     assertHasNullPaddingHere()
     assertContentEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV!!)),
+      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV)),
       outputReader.readNBytes(lenEncryptedV))
     assertHasNullPaddingHere()
   }

@@ -10,6 +10,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.math.nextDown
 
 /**
  * javax crypto wrapper using AES-256-GCM with a passphrase to generate or load keys.
@@ -34,8 +35,8 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
      * @param salt of size SALT_SIZE_BITS / 8
      * @param aad of size AAD_SIZE_BITS / 8
      */
-    fun fromKnownKeyData(passphrase: String, iv: ByteArray, salt: ByteArray, aad: ByteArray): AESGCMKey {
-      val spec = PBEKeySpec(passphrase.toCharArray(), salt, 65536, KEY_SIZE_BITS)
+    fun fromKnownKeyData(passphrase: CharArray, iv: ByteArray, salt: ByteArray, aad: ByteArray): AESGCMKey {
+      val spec = PBEKeySpec(passphrase, salt, 65536, KEY_SIZE_BITS)
       val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
       val keyBytes = factory.generateSecret(spec).encoded
 
@@ -52,7 +53,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
      *
      * @param passphrase used to generate the key
      */
-    fun fromNewPlaintextPassphrase(passphrase: String): AESGCMKey {
+    fun fromNewPlaintextPassphrase(passphrase: CharArray): AESGCMKey {
       val secureRandom: SecureRandom = SecureRandom.getInstanceStrong()
       val iv = ByteArray(IV_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
       val salt = ByteArray(SALT_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
@@ -68,7 +69,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
      * @param passphrase: key passphrase to initialize with
      * @param bytes: key data in packed bytes - should be IV, salt, then AAD
      */
-    fun fromSerializedBytes(passphrase: String, bytes: ByteArray): AESGCMKey {
+    fun fromSerializedBytes(passphrase: CharArray, bytes: ByteArray): AESGCMKey {
       val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
       val iv = ByteArray(IV_SIZE_BITS / 8)
       val salt = ByteArray(SALT_SIZE_BITS / 8)
@@ -77,6 +78,22 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
       buf.get(salt)
       buf.get(aad)
       return fromKnownKeyData(passphrase, iv, salt, aad)
+    }
+
+    /**
+     * Generate a temporary-use random key.
+     *
+     * @param size of passphrase to generate
+     */
+    fun temporaryKey(size: Int = 128): AESGCMKey {
+      val chars = CharArray(size)
+      for (i in 0..<size) {
+        val nd: Double = Math.random() / 1.0.nextDown()
+        chars[i] = Char(((1.0 - nd) + (99 * nd)).toInt())
+      }
+      val tempKey: AESGCMKey = fromNewPlaintextPassphrase(chars)
+      for (i in 0..<size) chars[i] = Char(0)
+      return tempKey
     }
   }
 

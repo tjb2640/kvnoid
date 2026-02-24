@@ -67,7 +67,7 @@ class KVNFileSpec202602167f {
      */
     fun parseFromBytes(
         restOfFile: BufferedInputStream,
-        passphrase: String): LoadedKVNData {
+        passphrase: CharArray): LoadedKVNData {
 
       // Read the next 4 bytes from the stream and convert to Int
       val readIntFromStream: (() -> Int) = {

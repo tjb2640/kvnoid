@@ -26,11 +26,11 @@ data class LoadedKVNData(
   val versionString: String,
   val dateCreated: Instant,
   var dateModified: Instant,
-  val category: String,
-  val nametag: String,
+  val category: String = "",
+  val nametag: String = "",
   var keyData: AESGCMKey?,
-  var decryptedK: String?,
-  var decryptedV: String?,
+  var decryptedK: String = "",
+  var decryptedV: String = "",
 ) {
 
   /**
@@ -44,9 +44,9 @@ data class LoadedKVNData(
   fun writeToDisk(absPath: String, passphrase: String) {
     // Make sure we have initialized properties marked as "mutable" (I'd rather have none mutable)
     // TODO maybe tighten that up later
-    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
-    this.decryptedK = this.decryptedK ?: ""
-    this.decryptedV = this.decryptedV ?: ""
+    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase.toCharArray())
+    this.decryptedK = this.decryptedK
+    this.decryptedV = this.decryptedV
     this.dateModified = Clock.System.now()
 
     try {
@@ -115,7 +115,7 @@ data class LoadedKVNData(
      * @param absPath path to flie
      * @param passphrase used to generate the decryption key and unlock the file
      */
-    fun readFromAbsolutePath(absPath: String, passphrase: String): LoadedKVNData? {
+    fun readFromAbsolutePath(absPath: String, passphrase: CharArray): LoadedKVNData? {
       // We only care here about the magic bytes and version (always 7b and 5b respectively)
       val headerBytesMagic = ByteArray(KVNFILE_SIZE_HEADER_MAGIC)
       val headerBytesVersion = ByteArray(KVNFILE_SIZE_HEADER_VERSION)
