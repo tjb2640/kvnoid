@@ -18,19 +18,17 @@ import kotlin.time.Instant
  * @property dateModified changes when file is saved
  * @property category arbitrary, stored plaintext
  * @property nametag same as category
- * @property decryptedK stored with AES-256-GCM encryption
- * @property decryptedV same as decryptedK
+ * @property decryptedV stored with AES-256-GCM encryption
  */
 data class LoadedKVNData(
-  val uuid: UUID, // TODO: store in file
+  val uuid: UUID,
   val versionString: String,
   val dateCreated: Instant,
   var dateModified: Instant,
-  val category: String = "",
-  val nametag: String = "",
+  val category: ByteArray = ByteArray(1),
+  val nametag: ByteArray = ByteArray(1),
   var keyData: AESGCMKey?,
-  var decryptedK: String = "",
-  var decryptedV: String = "",
+  var decryptedV: ByteArray = ByteArray(1),
 ) {
 
   /**
@@ -45,7 +43,6 @@ data class LoadedKVNData(
     // Make sure we have initialized properties marked as "mutable" (I'd rather have none mutable)
     // TODO maybe tighten that up later
     this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase.toCharArray())
-    this.decryptedK = this.decryptedK
     this.decryptedV = this.decryptedV
     this.dateModified = Clock.System.now()
 
@@ -141,6 +138,36 @@ data class LoadedKVNData(
       }
       return null
     }
+  }
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+
+    other as LoadedKVNData
+
+    if (uuid != other.uuid) return false
+    if (versionString != other.versionString) return false
+    if (dateCreated != other.dateCreated) return false
+    if (dateModified != other.dateModified) return false
+    if (!category.contentEquals(other.category)) return false
+    if (!nametag.contentEquals(other.nametag)) return false
+    if (keyData != other.keyData) return false
+    if (!decryptedV.contentEquals(other.decryptedV)) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    var result = uuid.hashCode()
+    result = 31 * result + versionString.hashCode()
+    result = 31 * result + dateCreated.hashCode()
+    result = 31 * result + dateModified.hashCode()
+    result = 31 * result + category.hashCode()
+    result = 31 * result + nametag.hashCode()
+    result = 31 * result + (keyData?.hashCode() ?: 0)
+    result = 31 * result + decryptedV.contentHashCode()
+    return result
   }
 
 }

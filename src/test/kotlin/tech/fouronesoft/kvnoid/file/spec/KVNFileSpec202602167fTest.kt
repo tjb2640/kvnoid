@@ -9,6 +9,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import java.util.UUID
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -32,11 +33,10 @@ class KVNFileSpec202602167fTest {
       versionString = "202602167f",
       dateCreated = Instant.fromEpochMilliseconds(3000),
       dateModified = Instant.fromEpochMilliseconds(9001),
-      category = "dummy_category",
-      nametag = "dummy_nametag",
+      category = DataSerializationUtils.stringToUTF8ByteArray("dummy_category"),
+      nametag = DataSerializationUtils.stringToUTF8ByteArray("dummy_nametag"),
       keyData = GeneratedTestKey.instance,
-      decryptedK = "sample k",
-      decryptedV = "sample v"
+      decryptedV = DataSerializationUtils.stringToUTF8ByteArray("sample v")
     )
   }
 
@@ -70,6 +70,15 @@ class KVNFileSpec202602167fTest {
       assertContentEquals(ByteArray(KVNFileSpec202602167f.PAD_SIZE), outputReader.readNBytes(4))
     }
 
+    // Check UUID
+    val bytesUUIDMostSig = outputReader.readNBytes(8)
+    val bytesUUIDLeastSig = outputReader.readNBytes(8)
+    assertEquals(
+      loadedKVNData.uuid,
+      UUID(
+        DataSerializationUtils.byteArrayToLongLE(bytesUUIDMostSig),
+        DataSerializationUtils.byteArrayToLongLE(bytesUUIDLeastSig)))
+
     // Take a look at these longs (date created and modified)
     assertEquals(
       loadedKVNData.dateCreated.toEpochMilliseconds(),
@@ -85,22 +94,18 @@ class KVNFileSpec202602167fTest {
     val lenCategory = DataSerializationUtils.byteArrayToIntLE(outputReader.readNBytes(4))
     val lenNametag = DataSerializationUtils.byteArrayToIntLE(outputReader.readNBytes(4))
     val lenKeyData = DataSerializationUtils.byteArrayToIntLE(outputReader.readNBytes(4))
-    val lenEncryptedK = DataSerializationUtils.byteArrayToIntLE(outputReader.readNBytes(4))
     val lenEncryptedV = DataSerializationUtils.byteArrayToIntLE(outputReader.readNBytes(4))
     assertEquals(
-      loadedKVNData.category.length,
+      loadedKVNData.category.size,
       lenCategory)
     assertEquals(
-      loadedKVNData.nametag.length,
+      loadedKVNData.nametag.size,
       lenNametag)
     assertEquals(
       loadedKVNData.keyData!!.serializeToBytes().size,
       lenKeyData)
     assertEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK)).size,
-      lenEncryptedK)
-    assertEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV)).size,
+      loadedKVNData.keyData!!.encrypt(loadedKVNData.decryptedV).size,
       lenEncryptedV)
 
     // Trailing reserved bytes should also be null; also test null padding (4B)
@@ -110,11 +115,11 @@ class KVNFileSpec202602167fTest {
     // Body content
     // Testing data read from file with written length matches byte array in UTF-8
     assertContentEquals(
-      DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.category),
+      loadedKVNData.category,
       outputReader.readNBytes(lenCategory))
     assertHasNullPaddingHere()
     assertContentEquals(
-      DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.nametag),
+      loadedKVNData.nametag,
       outputReader.readNBytes(lenNametag))
     assertHasNullPaddingHere()
     assertContentEquals(
@@ -122,11 +127,7 @@ class KVNFileSpec202602167fTest {
       outputReader.readNBytes(lenKeyData))
     assertHasNullPaddingHere()
     assertContentEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedK)),
-      outputReader.readNBytes(lenEncryptedK))
-    assertHasNullPaddingHere()
-    assertContentEquals(
-      loadedKVNData.keyData!!.encrypt(DataSerializationUtils.stringToUTF8ByteArray(loadedKVNData.decryptedV)),
+      loadedKVNData.keyData!!.encrypt(loadedKVNData.decryptedV),
       outputReader.readNBytes(lenEncryptedV))
     assertHasNullPaddingHere()
   }
