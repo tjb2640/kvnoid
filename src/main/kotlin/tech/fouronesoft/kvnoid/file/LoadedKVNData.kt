@@ -6,27 +6,14 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.UUID
 import kotlin.time.Clock
-import kotlin.time.Instant
 
 /**
  * KVN data model and helpers for reading and writing.
  * Should be agnostic to file format versioning
- * @property versionString first 8 characters determine the parsing class
- * @property dateCreated never changes
- * @property dateModified changes when file is saved
- * @property category arbitrary, stored plaintext
- * @property nametag same as category
- * @property decryptedV stored with AES-256-GCM encryption
  */
 data class LoadedKVNData(
-  val uuid: UUID,
-  val versionString: String,
-  val dateCreated: Instant,
-  var dateModified: Instant,
-  val category: ByteArray = ByteArray(1),
-  val nametag: ByteArray = ByteArray(1),
+  var metadata: KVNFileMetadata,
   var keyData: AESGCMKey?,
   var decryptedV: ByteArray = ByteArray(1),
 ) {
@@ -44,13 +31,13 @@ data class LoadedKVNData(
     // TODO maybe tighten that up later
     this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase.toCharArray())
     this.decryptedV = this.decryptedV
-    this.dateModified = Clock.System.now()
+    this.metadata.dateModified = Clock.System.now()
 
     try {
       BufferedOutputStream(File(absPath).outputStream()).use { writer ->
-        when (this.versionString.subSequence(0..7)) {
+        when (this.metadata.versionString.subSequence(0..7)) {
           "20260216" -> KVNFileSpec202602167f.writeToDisk(this, writer)
-          else -> throw RuntimeException("Unable to read version ${this.versionString}")
+          else -> throw RuntimeException("Unable to read version ${this.metadata.versionString}")
         }
       }
     } catch (e: Exception) {
@@ -112,7 +99,7 @@ data class LoadedKVNData(
      * @param absPath path to flie
      * @param passphrase used to generate the decryption key and unlock the file
      */
-    fun readFromAbsolutePath(absPath: String, passphrase: CharArray): LoadedKVNData? {
+    fun readFromAbsolutePath(absPath: String, metadata: KVNFileMetadata, passphrase: CharArray): LoadedKVNData? {
       // We only care here about the magic bytes and version (always 7b and 5b respectively)
       val headerBytesMagic = ByteArray(KVNFILE_SIZE_HEADER_MAGIC)
       val headerBytesVersion = ByteArray(KVNFILE_SIZE_HEADER_VERSION)
@@ -128,6 +115,7 @@ data class LoadedKVNData(
           val headerStringVersion: String = versionBytesToString(headerBytesVersion)
           when (headerStringVersion.substring(0..7)) {
             "20260216" -> return KVNFileSpec202602167f.parseFromBytes(
+              metadata = metadata,
               restOfFile = reader,
               passphrase = passphrase)
             else -> throw RuntimeException("Unable to read version $headerStringVersion")
@@ -146,12 +134,7 @@ data class LoadedKVNData(
 
     other as LoadedKVNData
 
-    if (uuid != other.uuid) return false
-    if (versionString != other.versionString) return false
-    if (dateCreated != other.dateCreated) return false
-    if (dateModified != other.dateModified) return false
-    if (!category.contentEquals(other.category)) return false
-    if (!nametag.contentEquals(other.nametag)) return false
+    if (metadata != other.metadata) return false
     if (keyData != other.keyData) return false
     if (!decryptedV.contentEquals(other.decryptedV)) return false
 
@@ -159,12 +142,7 @@ data class LoadedKVNData(
   }
 
   override fun hashCode(): Int {
-    var result = uuid.hashCode()
-    result = 31 * result + versionString.hashCode()
-    result = 31 * result + dateCreated.hashCode()
-    result = 31 * result + dateModified.hashCode()
-    result = 31 * result + category.hashCode()
-    result = 31 * result + nametag.hashCode()
+    var result = metadata.hashCode()
     result = 31 * result + (keyData?.hashCode() ?: 0)
     result = 31 * result + decryptedV.contentHashCode()
     return result

@@ -10,8 +10,6 @@ repositories {
 }
 
 dependencies {
-  implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
-  implementation("org.kotlincrypto.hash:sha3")
   testImplementation(kotlin("test"))
 }
 
