@@ -2,6 +2,8 @@ package tech.fouronesoft.kvnoid.util
 
 import tech.fouronesoft.kvnoid.encryption.AESGCMKey
 
+const val ZERO_BYTE: Byte = 0.toByte()
+
 /**
  * A way to store String data in memory in an obfuscated way
  */
@@ -27,7 +29,7 @@ class ObfuscatedString(
   fun setValue(newValue: ByteArray, overwrite: Boolean = false): ObfuscatedString {
     this.value = this.encryptionKey.encrypt(newValue)
     if (overwrite)
-      for (i in 0..<newValue.size) newValue[i] = 0.toByte()
+      for (i in 0..<newValue.size) newValue[i] = ZERO_BYTE
     return this
   }
 
@@ -43,7 +45,7 @@ class ObfuscatedString(
 
     for (i in 0..<decryptedByteArray.size) {
       charArray[i] = decryptedByteArray[i].toInt().toChar()
-      decryptedByteArray[i] = 0
+      decryptedByteArray[i] = ZERO_BYTE
     }
 
     return ValueProvider(charArray)

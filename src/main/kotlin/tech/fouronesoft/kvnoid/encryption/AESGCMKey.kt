@@ -1,7 +1,6 @@
 package tech.fouronesoft.kvnoid.encryption
 
 import tech.fouronesoft.kvnoid.util.DataSerializationUtils
-import tech.fouronesoft.kvnoid.util.DataSerializationUtils.Companion.STANDARD_CHARSET
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.SecureRandom
@@ -16,27 +15,27 @@ import kotlin.math.nextDown
  * javax crypto wrapper using AES-256-GCM with a passphrase to generate or load keys.
  * Locked to AES-256-GCM.
  *
- * Right now I am not doing anything special with the AAD. TODO
+ * Right now I am not doing anything special with the AAD
  */
 class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteArray, val aad: ByteArray) {
 
   companion object {
-    const val AAD_SIZE_BITS = 128
-    const val KEY_SIZE_BITS = 256
-    const val SALT_SIZE_BITS = KEY_SIZE_BITS
-    const val IV_SIZE_BITS = 12 * 8
+    const val AAD_SIZE_BYTES = 128 / 8
+    const val KEY_SIZE_BYTES = 256 / 8
+    const val SALT_SIZE_BYTES = KEY_SIZE_BYTES
+    const val IV_SIZE_BYTES = 12
     const val ALGO_XFORM_STRING = "AES/GCM/NoPadding"
 
     /**
      * Builds a usable AES key given pre-known GCM key data.
      *
      * @param passphrase used to generate the key
-     * @param iv of size IV_SIZE_BITS / 8
-     * @param salt of size SALT_SIZE_BITS / 8
-     * @param aad of size AAD_SIZE_BITS / 8
+     * @param iv of size IV_SIZE_BYTES
+     * @param salt of size SALT_SIZE_BYTES
+     * @param aad of size AAD_SIZE_BYTES
      */
     fun fromKnownKeyData(passphrase: CharArray, iv: ByteArray, salt: ByteArray, aad: ByteArray): AESGCMKey {
-      val spec = PBEKeySpec(passphrase, salt, 65536, KEY_SIZE_BITS)
+      val spec = PBEKeySpec(passphrase, salt, 65536, KEY_SIZE_BYTES * 8)
       val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
       val keyBytes = factory.generateSecret(spec).encoded
 
@@ -55,9 +54,9 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
      */
     fun fromNewPlaintextPassphrase(passphrase: CharArray): AESGCMKey {
       val secureRandom: SecureRandom = SecureRandom.getInstanceStrong()
-      val iv = ByteArray(IV_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
-      val salt = ByteArray(SALT_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
-      val aad = ByteArray(AAD_SIZE_BITS / 8).apply { secureRandom.nextBytes(this) }
+      val iv = ByteArray(IV_SIZE_BYTES).apply { secureRandom.nextBytes(this) }
+      val salt = ByteArray(SALT_SIZE_BYTES).apply { secureRandom.nextBytes(this) }
+      val aad = ByteArray(AAD_SIZE_BYTES).apply { secureRandom.nextBytes(this) }
       return fromKnownKeyData(passphrase, iv, salt, aad)
     }
 
@@ -71,12 +70,15 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
      */
     fun fromSerializedBytes(passphrase: CharArray, bytes: ByteArray): AESGCMKey {
       val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-      val iv = ByteArray(IV_SIZE_BITS / 8)
-      val salt = ByteArray(SALT_SIZE_BITS / 8)
-      val aad = ByteArray(AAD_SIZE_BITS / 8)
+      val iv = ByteArray(IV_SIZE_BYTES)
+      val salt = ByteArray(SALT_SIZE_BYTES)
+      val aad = ByteArray(AAD_SIZE_BYTES)
       buf.get(iv)
       buf.get(salt)
       buf.get(aad)
+      println("Read IV  : ${iv.toHexString()}")
+      println("Read SALT: ${salt.toHexString()}")
+      println("Read AAD : ${aad.toHexString()}")
       return fromKnownKeyData(passphrase, iv, salt, aad)
     }
 
@@ -107,7 +109,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
     cipher.init(
       Cipher.ENCRYPT_MODE,
       this.secretKey,
-      GCMParameterSpec(AAD_SIZE_BITS, this.iv))
+      GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv))
     cipher.updateAAD(this.aad)
     return cipher.doFinal(plaintext)
   }
@@ -122,17 +124,15 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
     cipher.init(
       Cipher.DECRYPT_MODE,
       this.secretKey,
-      GCMParameterSpec(AAD_SIZE_BITS, this.iv))
+      GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv))
     cipher.updateAAD(this.aad)
     return cipher.doFinal(ciphertext)
   }
 
-  fun decryptToUTF8String(ciphertext: ByteArray): String {
-    return decrypt(ciphertext).toString(STANDARD_CHARSET)
-  }
-
   fun serializeToBytes(): ByteArray {
-    val buf = ByteBuffer.allocate((SALT_SIZE_BITS + IV_SIZE_BITS + AAD_SIZE_BITS) / 8).order(DataSerializationUtils.STANDARD_BYTE_ORDER)
+    val buf = ByteBuffer
+      .allocate(SALT_SIZE_BYTES + IV_SIZE_BYTES + AAD_SIZE_BYTES)
+      .order(DataSerializationUtils.STANDARD_BYTE_ORDER)
     buf.put(this.iv).put(this.salt).put(this.aad)
     return buf.array()
   }

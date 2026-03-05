@@ -1,10 +1,6 @@
 package tech.fouronesoft.kvnoid.file
 
-import tech.fouronesoft.kvnoid.file.LoadedKVNData.Companion.KVNFILE_HEADER_MAGIC
-import tech.fouronesoft.kvnoid.file.LoadedKVNData.Companion.KVNFILE_SIZE_HEADER_MAGIC
-import tech.fouronesoft.kvnoid.file.LoadedKVNData.Companion.KVNFILE_SIZE_HEADER_VERSION
-import tech.fouronesoft.kvnoid.file.LoadedKVNData.Companion.versionBytesToString
-import tech.fouronesoft.kvnoid.file.spec.KVNFileSpec202602167f
+import tech.fouronesoft.kvnoid.file.KVNFileData.Companion.versionBytesToString
 import java.io.BufferedInputStream
 import java.io.File
 import java.util.UUID
@@ -29,24 +25,17 @@ data class KVNFileMetadata (
 
   companion object {
     fun readFromAbsolutePath(absPath: String): KVNFileMetadata? {
-      // We only care here about the magic bytes and version (always 7b and 5b respectively)
-      val headerBytesMagic = ByteArray(KVNFILE_SIZE_HEADER_MAGIC)
-      val headerBytesVersion = ByteArray(KVNFILE_SIZE_HEADER_VERSION)
-
       try {
         BufferedInputStream(File(absPath).inputStream()).use { reader ->
-          reader.read(headerBytesMagic)
-          require(headerBytesMagic.contentEquals(KVNFILE_HEADER_MAGIC)) { "File is not a KVN file" }
-          reader.read(headerBytesVersion)
-
-          // Check version bytes - excluding revision
-          // Want to split out reading the rest of the file based on this value
-          val headerStringVersion: String = versionBytesToString(headerBytesVersion)
-          when (headerStringVersion.substring(0..7)) {
-            "20260216" -> return KVNFileSpec202602167f.parseMetadataFromBytes(
-              restOfFile = reader)
-            else -> throw RuntimeException("Unable to read file metadata with version $headerStringVersion")
+          // Check magic bytes (always 4 bytes)
+          // Then the next 4 bytes are the version string's bytes (in literal form)
+          require(reader.readNBytes(4).contentEquals(KVNFileReadWriter.KVNFILE_HEADER_MAGIC)) {
+            "File is not a KVN file"
           }
+          return KVNFileReadWriter.parseMetadataFromBytes(
+            fileVersion = versionBytesToString(reader.readNBytes(4)),
+            restOfFile = reader
+          )
         }
       } catch (_: Exception) {
         // TODO: Tighten up
