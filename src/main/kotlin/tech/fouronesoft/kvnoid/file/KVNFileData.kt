@@ -13,7 +13,7 @@ import kotlin.time.Clock
  */
 data class KVNFileData (
   var metadata: KVNFileMetadata,
-  var keyData: AESGCMKey?,
+  var keyData: AESGCMKey? = null,
   var decryptedV: ByteArray = ByteArray(1),
 ) {
 

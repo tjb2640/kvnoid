@@ -4,6 +4,7 @@ import tech.fouronesoft.kvnoid.file.KVNFileData.Companion.versionBytesToString
 import java.io.BufferedInputStream
 import java.io.File
 import java.util.UUID
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -11,16 +12,16 @@ import kotlin.time.Instant
  * Also stores some "information", i.e. category and nametag.
  */
 data class KVNFileMetadata (
-  val uuid: UUID,
-  val versionString: String,
-  val dateCreated: Instant,
-  var dateModified: Instant,
+  val uuid: UUID = UUID.randomUUID(),
+  val versionString: String = KVNFileReadWriter.WRITE_VERSION_STRING,
+  val dateCreated: Instant = Clock.System.now(),
+  var dateModified: Instant = Clock.System.now(),
   val category: ByteArray,
   val nametag: ByteArray,
-  val keyDataLength: Int,
-  val keyDataPosition: Int,
-  val encryptedVLength: Int,
-  val encryptedVPosition: Int
+  val keyDataLength: Int = 0,
+  val keyDataPosition: Int = 0,
+  val encryptedVLength: Int = 0,
+  val encryptedVPosition: Int = 0
 ) {
 
   companion object {

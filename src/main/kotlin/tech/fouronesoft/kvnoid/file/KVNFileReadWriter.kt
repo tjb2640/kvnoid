@@ -154,8 +154,8 @@ class KVNFileReadWriter {
 
       // Calc lengths of both sections
       val lenHeader = (4 + 4) +   // magic bytes and version string
-          (2 * Long.SIZE_BYTES)   // UUID bytes
-          (2 * Long.SIZE_BYTES)   // MS dates (longs)
+          (2 * Long.SIZE_BYTES) + // UUID bytes
+          (2 * Long.SIZE_BYTES) + // MS dates (longs)
           24 +                    // Reserved 24
           (4 * Int.SIZE_BYTES) +  // All written length values (ints)
           52 +                    // Reserved 52
@@ -211,7 +211,7 @@ class KVNFileReadWriter {
       writeBytes(serializedKeyBytes)
       writeBytes(encryptedV)
       writeBytes(ByteArray(SIZE_BYTES_PADDING))
-      if ((lenHeader + lenBody) % 4 != 0) { writer.write(ByteArray((lenHeader + lenBody) % 4)) }
+      if ((lenHeader + lenBody) % 4 != 0) { writer.write(ByteArray(4 - ((lenHeader + lenBody) % 4))) }
 
       writer.flush()
     }

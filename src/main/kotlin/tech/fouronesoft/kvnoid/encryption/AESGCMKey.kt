@@ -76,9 +76,6 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
       buf.get(iv)
       buf.get(salt)
       buf.get(aad)
-      println("Read IV  : ${iv.toHexString()}")
-      println("Read SALT: ${salt.toHexString()}")
-      println("Read AAD : ${aad.toHexString()}")
       return fromKnownKeyData(passphrase, iv, salt, aad)
     }
 
