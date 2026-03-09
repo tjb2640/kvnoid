@@ -60,8 +60,8 @@ class KVNFileReadWriterReadTest20260216 {
       readData.keyData!!.serializeToBytes()
     )
     assertContentEquals(
-      initialData.decryptedV,
-      readData.decryptedV
+      initialData.decryptedV!!.getProvider().get(),
+      readData.decryptedV!!.getProvider().get()
     )
   }
 

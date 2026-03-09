@@ -2,11 +2,13 @@ package tech.fouronesoft.kvnoid.file
 
 import tech.fouronesoft.kvnoid.encryption.AESGCMKey
 import tech.fouronesoft.kvnoid.util.DataSerializationUtils
+import tech.fouronesoft.kvnoid.util.ObfuscatedString
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.zip.CRC32
+import kotlin.collections.forEachIndexed
 import kotlin.time.Instant
 
 const val ZERO_BYTE: Byte = 0.toByte()
@@ -21,9 +23,9 @@ class KVNFileReadWriter {
     const val WRITE_VERSION_STRING: String = "20260216"
     val WRITE_VERSION_BYTES: ByteArray = KVNFileData.versionStringToBytes(WRITE_VERSION_STRING)
     const val SIZE_BYTES_PADDING: Int = 4
-    const val BYTELIMIT_CATEGORY: Int = 2048
-    const val BYTELIMIT_NAMETAG: Int = 2048
-    const val BYTELIMIT_V: Int = 32_000_000
+    const val BYTELIMIT_CATEGORY: Int = 256
+    const val BYTELIMIT_NAMETAG: Int = 256
+    const val BYTELIMIT_V: Int = 2048
 
     fun parseMetadataFromBytes(
         fileVersion: String,
@@ -90,8 +92,7 @@ class KVNFileReadWriter {
         // whenever the category or nametag properties change after a disk write.
         keyDataLength = lenKeyData,
         keyDataPosition = bytesRead,
-        encryptedVLength = lenEncryptedV,
-        encryptedVPosition = bytesRead + lenKeyData
+        encryptedVLength = lenEncryptedV
       )
     }
 
@@ -101,18 +102,21 @@ class KVNFileReadWriter {
      */
     fun decryptWithKnownData(
       metadata: KVNFileMetadata,
-      restOfFile: BufferedInputStream,
+      buffer: BufferedInputStream,
       passphrase: CharArray): KVNFileData {
 
       // Skip number of bytes read up to this point
-      restOfFile.skipNBytes(metadata.keyDataPosition.toLong())
+      buffer.skipNBytes(metadata.keyDataPosition.toLong())
 
-      val keyData = AESGCMKey.fromSerializedBytes(passphrase, restOfFile.readNBytes(metadata.keyDataLength))
-      keyData.decrypt(restOfFile.readNBytes(metadata.encryptedVLength)).also { decryptedBlock ->
+      val keyData = AESGCMKey.fromSerializedBytes(passphrase, buffer.readNBytes(metadata.keyDataLength))
+      keyData.decrypt(buffer.readNBytes(metadata.encryptedVLength)).also { decryptedBlock ->
         return KVNFileData(
           metadata = metadata,
           keyData = keyData,
-          decryptedV = decryptedBlock
+          decryptedV = ObfuscatedString(
+            initialValue = decryptedBlock,
+            overwriteInitialValueSource = true
+          )
         )
       }
     }
@@ -138,13 +142,23 @@ class KVNFileReadWriter {
       require(contents.metadata.nametag.size <= BYTELIMIT_NAMETAG) {
         "Name tag is limited to $BYTELIMIT_NAMETAG bytes in size; currently ${contents.metadata.nametag.size}"
       }
-      require(contents.decryptedV.size <= BYTELIMIT_V) {
-        "Stored value is limited to $BYTELIMIT_V bytes in size; currently ${contents.decryptedV.size}"
+      require(contents.decryptedV!!.getLength() <= BYTELIMIT_V) {
+        "Stored value is limited to $BYTELIMIT_V bytes in size; currently ${contents.decryptedV!!.getLength()}"
       }
 
       // Encryption action
       val serializedKeyBytes: ByteArray = contents.keyData!!.serializeToBytes()
-      val encryptedV: ByteArray = contents.keyData!!.encrypt(contents.decryptedV)
+      val encryptedV: ByteArray = contents.decryptedV!!.getProvider().use { provider ->
+        val inputBytes = ByteArray(provider.get().size)
+        provider.get().forEachIndexed { index, ch ->
+          inputBytes[index] = ch.code.toByte()
+        }
+        contents.keyData!!.encrypt(inputBytes).also {
+          inputBytes.forEachIndexed { index, _ ->
+            inputBytes[index] = 0.toByte()
+          }
+        }
+      }
 
       // Lengths (ints) as specified in the header spec
       val lenCategory: Int = contents.metadata.category.size

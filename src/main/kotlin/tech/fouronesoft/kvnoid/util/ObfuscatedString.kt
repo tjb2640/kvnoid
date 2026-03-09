@@ -9,11 +9,12 @@ const val ZERO_BYTE: Byte = 0.toByte()
  */
 class ObfuscatedString(
   initialValue: ByteArray = ByteArray(1),
-  overwriteInitialValueSource: Boolean = false,
+  overwriteInitialValueSource: Boolean = false
 ) {
 
   private val encryptionKey: AESGCMKey = AESGCMKey.temporaryKey(size = 128)
   private var value: ByteArray = ByteArray(0)
+  private var length: Int = 0
 
   init {
     setValue(newValue = initialValue, overwrite = overwriteInitialValueSource)
@@ -28,6 +29,7 @@ class ObfuscatedString(
    */
   fun setValue(newValue: ByteArray, overwrite: Boolean = false): ObfuscatedString {
     this.value = this.encryptionKey.encrypt(newValue)
+    this.length = newValue.size
     if (overwrite)
       for (i in 0..<newValue.size) newValue[i] = ZERO_BYTE
     return this
@@ -49,6 +51,13 @@ class ObfuscatedString(
     }
 
     return ValueProvider(charArray)
+  }
+
+  /**
+   * Returns the cached length of the original byte array
+   */
+  fun getLength(): Int {
+    return this.length
   }
 
   /**

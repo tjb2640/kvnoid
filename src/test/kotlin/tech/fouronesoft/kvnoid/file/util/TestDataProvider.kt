@@ -4,6 +4,7 @@ import tech.fouronesoft.kvnoid.encryption.AESGCMKey
 import tech.fouronesoft.kvnoid.file.KVNFileData
 import tech.fouronesoft.kvnoid.file.KVNFileMetadata
 import tech.fouronesoft.kvnoid.util.DataSerializationUtils
+import tech.fouronesoft.kvnoid.util.ObfuscatedString
 import java.util.UUID
 import kotlin.time.Instant
 
@@ -33,8 +34,7 @@ class TestDataProvider {
         nametag = DataSerializationUtils.stringToUTF8ByteArray(dummyNametag),
         keyDataLength = GeneratedTestKey.instance.serializeToBytes().size,
         keyDataPosition = -1,
-        encryptedVLength = -1,
-        encryptedVPosition = -1
+        encryptedVLength = -1
       )
     }
 
@@ -42,7 +42,7 @@ class TestDataProvider {
       return KVNFileData(
         metadata = generateKVNMetadata(versionString),
         keyData = GeneratedTestKey.instance,
-        decryptedV = DataSerializationUtils.stringToUTF8ByteArray(dummyDecryptedV)
+        decryptedV = ObfuscatedString(DataSerializationUtils.stringToUTF8ByteArray(dummyDecryptedV))
       )
     }
   }

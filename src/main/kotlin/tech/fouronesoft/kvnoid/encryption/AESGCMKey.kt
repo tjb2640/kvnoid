@@ -4,6 +4,7 @@ import tech.fouronesoft.kvnoid.util.DataSerializationUtils
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.SecureRandom
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -123,7 +124,11 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
       this.secretKey,
       GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv))
     cipher.updateAAD(this.aad)
-    return cipher.doFinal(ciphertext)
+    return try {
+      cipher.doFinal(ciphertext)
+    } catch (_: AEADBadTagException) {
+      ByteArray(0)
+    }
   }
 
   fun serializeToBytes(): ByteArray {

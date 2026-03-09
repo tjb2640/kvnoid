@@ -3,6 +3,8 @@ package tech.fouronesoft.kvnoid.file
 import tech.fouronesoft.kvnoid.file.KVNFileData.Companion.versionBytesToString
 import java.io.BufferedInputStream
 import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -11,7 +13,7 @@ import kotlin.time.Instant
  * Represents metadata about a KVN file.
  * Also stores some "information", i.e. category and nametag.
  */
-data class KVNFileMetadata (
+class KVNFileMetadata (
   val uuid: UUID = UUID.randomUUID(),
   val versionString: String = KVNFileReadWriter.WRITE_VERSION_STRING,
   val dateCreated: Instant = Clock.System.now(),
@@ -21,7 +23,7 @@ data class KVNFileMetadata (
   val keyDataLength: Int = 0,
   val keyDataPosition: Int = 0,
   val encryptedVLength: Int = 0,
-  val encryptedVPosition: Int = 0
+  var filePath: Path? = null
 ) {
 
   companion object {
@@ -36,7 +38,7 @@ data class KVNFileMetadata (
           return KVNFileReadWriter.parseMetadataFromBytes(
             fileVersion = versionBytesToString(reader.readNBytes(4)),
             restOfFile = reader
-          )
+          ).also { it.filePath = Paths.get(absPath) }
         }
       } catch (_: Exception) {
         // TODO: Tighten up

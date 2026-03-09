@@ -1,10 +1,13 @@
 package tech.fouronesoft.kvnoid.file
 
+import tech.fouronesoft.kvnoid.POSIX_FILEMOD_700
 import tech.fouronesoft.kvnoid.encryption.AESGCMKey
+import tech.fouronesoft.kvnoid.util.ObfuscatedString
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.File
 import java.nio.ByteBuffer
+import java.nio.file.Path
+import kotlin.io.path.setPosixFilePermissions
 import kotlin.time.Clock
 
 /**
@@ -14,7 +17,7 @@ import kotlin.time.Clock
 data class KVNFileData (
   var metadata: KVNFileMetadata,
   var keyData: AESGCMKey? = null,
-  var decryptedV: ByteArray = ByteArray(1),
+  var decryptedV: ObfuscatedString? = null
 ) {
 
   /**
@@ -22,20 +25,23 @@ data class KVNFileData (
    * Right now it uses the file spec version found in its own data. I might default to writing using the
    * newest version as this progresses...
    *
-   * @param absPath file path to write to
+   * @param path file path to write to
    * @passphrase passphrase (some kind of plaintext master key) to encrypt the file with
    */
-  fun writeToDisk(absPath: String, passphrase: String) {
-    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase.toCharArray())
+  fun writeToDisk(path: Path, passphrase: CharArray) {
+    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
     this.metadata.dateModified = Clock.System.now()
 
+    val absPath = path.toAbsolutePath()
     try {
-      BufferedOutputStream(File(absPath).outputStream()).use { writer ->
+      BufferedOutputStream(absPath.toFile().outputStream()).use { writer ->
         KVNFileReadWriter.writeToDisk(this, writer)
       }
     } catch (e: Exception) {
       // TODO
       throw e
+    } finally {
+      absPath.setPosixFilePermissions(POSIX_FILEMOD_700)
     }
   }
 
@@ -86,15 +92,15 @@ data class KVNFileData (
      * @param passphrase used to generate the decryption key and unlock the file
      */
     fun readFromAbsolutePath(
-        absPath: String,
+        path: Path,
         metadata: KVNFileMetadata,
         passphrase: CharArray): KVNFileData? {
 
       try {
-        BufferedInputStream(File(absPath).inputStream()).use { reader ->
+        BufferedInputStream(path.toAbsolutePath().toFile().inputStream()).use { reader ->
           return KVNFileReadWriter.decryptWithKnownData(
               metadata = metadata,
-              restOfFile = reader,
+              buffer = reader, // TODO: rename, since we don't read anything right here
               passphrase = passphrase)
         }
       } catch (_: Exception) {
@@ -102,26 +108,6 @@ data class KVNFileData (
       }
       return null
     }
-  }
-
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (javaClass != other?.javaClass) return false
-
-    other as KVNFileData
-
-    if (metadata != other.metadata) return false
-    if (keyData != other.keyData) return false
-    if (!decryptedV.contentEquals(other.decryptedV)) return false
-
-    return true
-  }
-
-  override fun hashCode(): Int {
-    var result = metadata.hashCode()
-    result = 31 * result + (keyData?.hashCode() ?: 0)
-    result = 31 * result + decryptedV.contentHashCode()
-    return result
   }
 
 }

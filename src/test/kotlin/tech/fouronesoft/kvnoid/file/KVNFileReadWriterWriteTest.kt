@@ -9,6 +9,7 @@ import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import kotlin.collections.forEachIndexed
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
@@ -92,10 +93,16 @@ class KVNFileReadWriterWriteTest {
       kvnFileData.keyData!!.serializeToBytes().size,
       lenKeyData
     )
-    assertEquals(
-      kvnFileData.keyData!!.encrypt(kvnFileData.decryptedV).size,
-      lenEncryptedV
-    )
+    val inputBytes = ByteArray(kvnFileData.decryptedV!!.getLength())
+    kvnFileData.decryptedV!!.getProvider().use { provider ->
+      provider.get().forEachIndexed { index, ch ->
+        inputBytes[index] = ch.code.toByte()
+      }
+      assertEquals(
+        kvnFileData.keyData!!.encrypt(inputBytes).size,
+        lenEncryptedV
+      )
+    }
 
     // Trailing reserved bytes should also be null; also test null padding (4B)
     assertContentEquals(ByteArray(52), outputReader.readNBytes(52))
@@ -117,7 +124,7 @@ class KVNFileReadWriterWriteTest {
       outputReader.readNBytes(lenKeyData)
     )
     assertContentEquals(
-      kvnFileData.keyData!!.encrypt(kvnFileData.decryptedV),
+      kvnFileData.keyData!!.encrypt(inputBytes),
       outputReader.readNBytes(lenEncryptedV)
     )
     assertHasNullPaddingHere()
