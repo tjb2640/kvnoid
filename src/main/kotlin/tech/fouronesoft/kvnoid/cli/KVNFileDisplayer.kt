@@ -23,7 +23,7 @@ val DISPLAYER_INSTRUCTIONS = StringBuilder().apply {
  * - The window size can be controlled via this fun's `windowSize` parameter. A window size of 0 will dump the decrypted
  *   value on screen without windowing it.
  */
-class KVNFileDisplayer (val kvnFile: KVNFileData) {
+class KVNFileDisplayer(val kvnFile: KVNFileData) {
 
   var displaying: Boolean = true
   var windowPosition = 0
@@ -36,23 +36,21 @@ class KVNFileDisplayer (val kvnFile: KVNFileData) {
     val strCategory = kvnFile.metadata.category.toString(DataSerializationUtils.STANDARD_CHARSET)
     val strCreated = kvnFile.metadata.dateCreated.toString()
     val strModified = kvnFile.metadata.dateModified.toString()
-    strMetadataHeader = StringBuilder()
-      .append("${Terminal.wrap("KVN", Terminal.RED)} :: ")
+    strMetadataHeader = StringBuilder().append("${Terminal.wrap("KVN", Terminal.RED)} :: ")
       .appendLine(Terminal.wrap("${kvnFile.metadata.uuid}", Terminal.GREEN))
       .appendLine(":: Category: '${Terminal.wrap(strCategory, Terminal.YELLOW)}' ")
       .appendLine(":: Nametag:  '${Terminal.wrap(strNametag, Terminal.YELLOW)}' ")
       .appendLine(":: Created:  '${Terminal.wrap(strCreated, Terminal.YELLOW)}' ")
-      .appendLine(":: Modified: '${Terminal.wrap(strModified, Terminal.YELLOW)}'")
-      .toString()
+      .appendLine(":: Modified: '${Terminal.wrap(strModified, Terminal.YELLOW)}'").toString()
   }
 
   /**
    * Displays the pre-calculated `DISPLAYER_INSTRUCTIONS` on-screen and displays a "command" prompt to the user.
    */
   fun drawInstructionalPrompt() {
-    print(StringBuilder("\n")
-      .appendLine(DISPLAYER_INSTRUCTIONS)
-      .append("  ╰─> command: "))
+    print(
+      StringBuilder("\n").appendLine(DISPLAYER_INSTRUCTIONS).append("  ╰─> command: ")
+    )
   }
 
   /**
@@ -91,13 +89,19 @@ class KVNFileDisplayer (val kvnFile: KVNFileData) {
 
     return when (firstChar) {
       // Next [amt?1]
-      'n' -> (windowPosition + (1.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: 1))).coerceIn(0, decryptedVLength - 1)
+      'n' -> (windowPosition + (1.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: 1))).coerceIn(
+        0, decryptedVLength - 1
+      )
 
       // Back [amt?1]
-      'b' -> (windowPosition - (1.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: 1))).coerceIn(0, decryptedVLength - 1)
+      'b' -> (windowPosition - (1.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: 1))).coerceIn(
+        0, decryptedVLength - 1
+      )
 
       // set Position [n?current]
-      'p' -> windowPosition.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: windowPosition).coerceIn(0, decryptedVLength - 1)
+      'p' -> windowPosition.takeIf { cmds.size == 1 } ?: (cmds[1].toIntOrNull() ?: windowPosition).coerceIn(
+        0, decryptedVLength - 1
+      )
 
       // Start
       's' -> 0
@@ -161,8 +165,11 @@ class KVNFileDisplayer (val kvnFile: KVNFileData) {
         appendLine(windowBoundaryPlusses)
         append(PADDING_TABOVER)
         append(Terminal.GREY.code)
-        append("$windowPosition - ${(windowPosition + windowSize - 1)
-          .coerceAtMost(decryptedVLength - 1)} in $decryptedVLength total")
+        append(
+          "$windowPosition - ${
+            (windowPosition + windowSize - 1).coerceAtMost(decryptedVLength - 1)
+          } in $decryptedVLength total"
+        )
         appendLine(Terminal.RESET.code)
       }.toString())
 

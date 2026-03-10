@@ -23,13 +23,13 @@ class KVNFileReadWriter {
     const val WRITE_VERSION_STRING: String = "20260216"
     val WRITE_VERSION_BYTES: ByteArray = KVNFileData.versionStringToBytes(WRITE_VERSION_STRING)
     const val SIZE_BYTES_PADDING: Int = 4
-    const val BYTELIMIT_CATEGORY: Int = 256
-    const val BYTELIMIT_NAMETAG: Int = 256
+    const val BYTELIMIT_CATEGORY: Int = 16
+    const val BYTELIMIT_NAMETAG: Int = 16
     const val BYTELIMIT_V: Int = 2048
 
     fun parseMetadataFromBytes(
-        fileVersion: String,
-        restOfFile: BufferedInputStream): KVNFileMetadata {
+      fileVersion: String, restOfFile: BufferedInputStream
+    ): KVNFileMetadata {
 
       val crc = CRC32()
       var bytesRead = 4 + 4 // magic bytes and version code
@@ -69,7 +69,8 @@ class KVNFileReadWriter {
       val bytesCategory = readNBytes(lenCategory)
       val bytesNametag = readNBytes(lenNametag)
       val crcFromFile: Long = DataSerializationUtils.byteArrayToLongLE(
-        restOfFile.readNBytes(Long.SIZE_BYTES))
+        restOfFile.readNBytes(Long.SIZE_BYTES)
+      )
       bytesRead += Long.SIZE_BYTES
 
       // Verify CRC
@@ -101,9 +102,8 @@ class KVNFileReadWriter {
      * TODO
      */
     fun decryptWithKnownData(
-      metadata: KVNFileMetadata,
-      buffer: BufferedInputStream,
-      passphrase: CharArray): KVNFileData {
+      metadata: KVNFileMetadata, buffer: BufferedInputStream, passphrase: CharArray
+    ): KVNFileData {
 
       // Skip number of bytes read up to this point
       buffer.skipNBytes(metadata.keyDataPosition.toLong())
@@ -111,11 +111,8 @@ class KVNFileReadWriter {
       val keyData = AESGCMKey.fromSerializedBytes(passphrase, buffer.readNBytes(metadata.keyDataLength))
       keyData.decrypt(buffer.readNBytes(metadata.encryptedVLength)).also { decryptedBlock ->
         return KVNFileData(
-          metadata = metadata,
-          keyData = keyData,
-          decryptedV = ObfuscatedString(
-            initialValue = decryptedBlock,
-            overwriteInitialValueSource = true
+          metadata = metadata, keyData = keyData, decryptedV = ObfuscatedString(
+            initialValue = decryptedBlock, overwriteInitialValueSource = true
           )
         )
       }
@@ -130,8 +127,7 @@ class KVNFileReadWriter {
      * @see KVNFileData.writeToDisk
      */
     fun writeToDisk(
-      contents: KVNFileData,
-      writer: BufferedOutputStream
+      contents: KVNFileData, writer: BufferedOutputStream
     ) {
 
       requireNotNull(contents.keyData) { "Key data was not initialized" }
@@ -173,9 +169,7 @@ class KVNFileReadWriter {
           24 +                    // Reserved 24
           (4 * Int.SIZE_BYTES) +  // All written length values (ints)
           52 +                    // Reserved 52
-          lenCategory +
-          lenNametag +
-          Long.SIZE_BYTES +       // CRC32
+          lenCategory + lenNametag + Long.SIZE_BYTES +       // CRC32
           SIZE_BYTES_PADDING
       val lenBody = lenKeyBytes + lenEV + SIZE_BYTES_PADDING
 
@@ -225,7 +219,9 @@ class KVNFileReadWriter {
       writeBytes(serializedKeyBytes)
       writeBytes(encryptedV)
       writeBytes(ByteArray(SIZE_BYTES_PADDING))
-      if ((lenHeader + lenBody) % 4 != 0) { writer.write(ByteArray(4 - ((lenHeader + lenBody) % 4))) }
+      if ((lenHeader + lenBody) % 4 != 0) {
+        writer.write(ByteArray(4 - ((lenHeader + lenBody) % 4)))
+      }
 
       writer.flush()
     }

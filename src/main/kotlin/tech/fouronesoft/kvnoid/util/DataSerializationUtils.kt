@@ -24,8 +24,8 @@ class DataSerializationUtils {
      */
     fun byteArrayToIntLE(array: ByteArray): Int {
       require(array.size == 4) { "4 bytes required here" }
-      return array.foldIndexed(0) {
-        i, acc, byte -> acc or (byte.toInt() and 0xFF shl (i * 8))
+      return array.foldIndexed(0) { i, acc, byte ->
+        acc or (byte.toInt() and 0xFF shl (i * 8))
       }
     }
 
@@ -39,8 +39,8 @@ class DataSerializationUtils {
      */
     fun byteArrayToLongLE(array: ByteArray): Long {
       require(array.size == 8) { "8 bytes required here" }
-      return array.foldIndexed(0L) {
-          i, acc, byte -> acc or (byte.toLong() and 0xFF shl (i * 8))
+      return array.foldIndexed(0L) { i, acc, byte ->
+        acc or (byte.toLong() and 0xFF shl (i * 8))
       }
     }
 

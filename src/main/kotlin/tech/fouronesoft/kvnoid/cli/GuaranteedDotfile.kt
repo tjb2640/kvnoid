@@ -22,9 +22,8 @@ val DOTFILE_LOCATION: Path = Paths.get(System.getProperty("user.home"), ".config
  * - Its file is guaranteed to exist once this fun returns, barring filesystem permission issues.
  * - The instance's `value` can be mutated. After changing the `value`, call `saveValueToDisk()` to disk it.
  */
-class GuaranteedDotfile private constructor (
-  val name: String,
-  var value: String
+class GuaranteedDotfile private constructor(
+  val name: String, var value: String
 ) {
 
   init {
@@ -37,8 +36,7 @@ class GuaranteedDotfile private constructor (
    */
   fun saveValueToDisk() {
     ensureDotfileDirExists()
-    Paths.get(DOTFILE_LOCATION.absolutePathString(), name)
-      .toFile()
+    Paths.get(DOTFILE_LOCATION.absolutePathString(), name).toFile()
       .writeText(value, DataSerializationUtils.STANDARD_CHARSET)
   }
 
@@ -69,11 +67,9 @@ class GuaranteedDotfile private constructor (
      */
     fun readMaybeCreate(name: String, defaultValue: String = ""): GuaranteedDotfile {
       ensureDotfileDirExists()
-      return GuaranteedDotfile(
-        name = name,
-        value = defaultValue.takeIf { !dotfileWithNameExists(name) } ?: Paths.get(DOTFILE_LOCATION.absolutePathString(), name)
-          .toFile()
-          .readText(DataSerializationUtils.STANDARD_CHARSET))
+      return GuaranteedDotfile(name = name, value = defaultValue.takeIf { !dotfileWithNameExists(name) } ?: Paths.get(
+        DOTFILE_LOCATION.absolutePathString(), name
+      ).toFile().readText(DataSerializationUtils.STANDARD_CHARSET))
     }
   }
 }

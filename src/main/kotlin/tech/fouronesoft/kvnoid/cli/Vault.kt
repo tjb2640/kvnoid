@@ -12,7 +12,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.isDirectory
 import kotlin.io.path.setPosixFilePermissions
 
-class Vault (val vaultPath: Path, val vaultKey: ObfuscatedString) {
+class Vault(val vaultPath: Path, val vaultKey: ObfuscatedString) {
 
   private val uuidToMetadata: MutableMap<UUID, KVNFileMetadata> = mutableMapOf()
   private val filepathToUUID: MutableMap<Path, UUID> = mutableMapOf()
@@ -50,8 +50,8 @@ class Vault (val vaultPath: Path, val vaultKey: ObfuscatedString) {
     val filePath = getPathFor(kvnFileData)
     vaultKey.getProvider().use { provider ->
       kvnFileData.writeToDisk(
-        path = filePath,
-        passphrase = provider.get())
+        path = filePath, passphrase = provider.get()
+      )
     }
     indexFile(filePath)
   }
@@ -63,9 +63,7 @@ class Vault (val vaultPath: Path, val vaultKey: ObfuscatedString) {
 
     vaultKey.getProvider().use { provider ->
       return KVNFileData.readFromAbsolutePath(
-        path = filepath,
-        metadata = metadata,
-        passphrase = provider.get()
+        path = filepath, metadata = metadata, passphrase = provider.get()
       )
     }
   }

@@ -12,11 +12,8 @@ import kotlin.system.exitProcess
 
 class KVNoidCLIApplication {
 
-  data class CLIArgument (
-    val name: String,
-    val help: String,
-    val example: String,
-    val dotfile: GuaranteedDotfile
+  data class CLIArgument(
+    val name: String, val help: String, val example: String, val dotfile: GuaranteedDotfile
   )
 
   companion object {
@@ -25,21 +22,23 @@ class KVNoidCLIApplication {
     private val PROGRAM_OPTS: Map<String, CLIArgument> = mapOf(
       "vault-location" to CLIArgument(
         name = "vault-location",
-        help = "${Terminal.wrap("(abspath)", Terminal.BLUE)} " +
-            "location of .kvn files; usurps dotfile setting",
+        help = "${Terminal.wrap("(abspath)", Terminal.BLUE)} " + "location of .kvn files; usurps dotfile setting",
         example = "/path/to/vault/location",
         dotfile = GuaranteedDotfile.readMaybeCreate(
-          name = "vault-location",
-          defaultValue = Path(USER_HOME, ".kvnoid", "vault").absolutePathString()),
-      ),
-      "allow-insecure-vault-key" to CLIArgument(
+          name = "vault-location", defaultValue = Path(USER_HOME, ".kvnoid", "vault").absolutePathString()
+        ),
+      ), "allow-insecure-vault-key" to CLIArgument(
         name = "allow-insecure-vault-key",
-        help = "${Terminal.wrap("(true/false)", Terminal.BLUE)} " +
-            "disable 12-character minimum length check for vault key prompt?",
+        help = "${
+          Terminal.wrap(
+            "(true/false)",
+            Terminal.BLUE
+          )
+        } " + "disable 12-character minimum length check for vault key prompt?",
         example = "false",
         dotfile = GuaranteedDotfile.readMaybeCreate(
-          name = "allow-insecure-vault-key",
-          defaultValue = "false")
+          name = "allow-insecure-vault-key", defaultValue = "false"
+        )
       )
     )
 
@@ -76,22 +75,30 @@ class KVNoidCLIApplication {
       for (i in 0..<args.size step 2) {
         // Length check
         args[i].takeIf { args[i].lowercase().length >= 2 } ?: exitWithMessage(
-          message = "Argument name at position $i unrecognized; run " +
-              Terminal.wrap("kvnoid --help", Terminal.YELLOW),
-          status = 2)
+          message = "Argument name at position $i unrecognized; run " + Terminal.wrap("kvnoid --help", Terminal.YELLOW),
+          status = 2
+        )
 
         // Format check
         args[i].takeIf { it.startsWith("--") } ?: exitWithMessage(
-          message = "Argument ${Terminal.wrap(args[i], Terminal.RED)} not in the --correct-format; run " +
-              Terminal.wrap("kvnoid --help", Terminal.YELLOW),
-          status = 2)
+          message = "Argument ${
+            Terminal.wrap(
+              args[i],
+              Terminal.RED
+            )
+          } not in the --correct-format; run " + Terminal.wrap("kvnoid --help", Terminal.YELLOW), status = 2
+        )
 
         // Argument recognized?
         val key = args[i].lowercase().substring(2)
         key.takeIf { it in PROGRAM_OPTS } ?: exitWithMessage(
-          message = "Unrecognized argument ${Terminal.wrap(args[i], Terminal.RED)}; run " +
-              Terminal.wrap("kvnoid --help", Terminal.YELLOW),
-          status = 2)
+          message = "Unrecognized argument ${
+            Terminal.wrap(
+              args[i],
+              Terminal.RED
+            )
+          }; run " + Terminal.wrap("kvnoid --help", Terminal.YELLOW), status = 2
+        )
 
         // Store argument's value
         result[key] = args[i + 1]
@@ -143,8 +150,7 @@ class KVNoidCLIApplication {
         }
 
         return ObfuscatedString(
-          initialValue = inputBytes,
-          overwriteInitialValueSource = true
+          initialValue = inputBytes, overwriteInitialValueSource = true
         )
       }
     }
@@ -153,9 +159,11 @@ class KVNoidCLIApplication {
     fun main(args: Array<String>) {
       val parsedArgs: Map<String, String> = parseArgs(args)
       val allowShortPassphrase = parsedArgs["allow-insecure-vault-key"]!!.trim().toBoolean()
-      KVNVaultBrowser(Vault(
-        vaultPath = Paths.get(parsedArgs["vault-location"]!!),
-        vaultKey = promptAndCacheVaultKey(allowShortPassphrase).also { Terminal.resetScreen() })).drawOnLoop()
+      KVNVaultBrowser(
+        Vault(
+          vaultPath = Paths.get(parsedArgs["vault-location"]!!),
+          vaultKey = promptAndCacheVaultKey(allowShortPassphrase).also { Terminal.resetScreen() })
+      ).run()
     }
   }
 }

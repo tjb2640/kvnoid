@@ -14,10 +14,8 @@ import kotlin.time.Clock
  * KVN data model and helpers for reading and writing.
  * Should be agnostic to file format versioning
  */
-data class KVNFileData (
-  var metadata: KVNFileMetadata,
-  var keyData: AESGCMKey? = null,
-  var decryptedV: ObfuscatedString? = null
+class KVNFileData(
+  var metadata: KVNFileMetadata, var keyData: AESGCMKey? = null, var decryptedV: ObfuscatedString? = null
 ) {
 
   /**
@@ -55,7 +53,7 @@ data class KVNFileData (
      * @throws RuntimeException if versionBytes parameter is not 4 bytes in size
      */
     fun versionBytesToString(versionBytes: ByteArray): String {
-      require (versionBytes.size == 4) {
+      require(versionBytes.size == 4) {
         "Version bytes array must always be 4 bytes in size"
       }
       val century = versionBytes[0].toString().padStart(2, '0')
@@ -73,14 +71,14 @@ data class KVNFileData (
      * @return ByteArray special representation
      */
     fun versionStringToBytes(versionString: String): ByteArray {
-      require (versionString.length == 8) {
+      require(versionString.length == 8) {
         "Bad length for version string, expected 8, got ${versionString.length}"
       }
       val byteBuf: ByteBuffer = ByteBuffer.allocate(4)
       for (i in 0..3) {
-        byteBuf.put(versionString
-          .substring((i * 2), (i * 2) + 2)
-          .toByte(10))
+        byteBuf.put(
+          versionString.substring((i * 2), (i * 2) + 2).toByte(10)
+        )
       }
       return byteBuf.array()
     }
@@ -92,16 +90,15 @@ data class KVNFileData (
      * @param passphrase used to generate the decryption key and unlock the file
      */
     fun readFromAbsolutePath(
-        path: Path,
-        metadata: KVNFileMetadata,
-        passphrase: CharArray): KVNFileData? {
+      path: Path, metadata: KVNFileMetadata, passphrase: CharArray
+    ): KVNFileData? {
 
       try {
         BufferedInputStream(path.toAbsolutePath().toFile().inputStream()).use { reader ->
           return KVNFileReadWriter.decryptWithKnownData(
-              metadata = metadata,
-              buffer = reader, // TODO: rename, since we don't read anything right here
-              passphrase = passphrase)
+            metadata = metadata, buffer = reader, // TODO: rename, since we don't read anything right here
+            passphrase = passphrase
+          )
         }
       } catch (_: Exception) {
         // TODO: Tighten up

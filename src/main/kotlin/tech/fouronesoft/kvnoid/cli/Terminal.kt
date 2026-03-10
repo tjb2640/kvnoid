@@ -3,7 +3,7 @@ package tech.fouronesoft.kvnoid.cli
 /**
  * ANSI formatting values and helper functions for terminal formatting in its companion
  */
-enum class Terminal (val code: String) {
+enum class Terminal(val code: String) {
   RESET("\u001B[0m"),
   RED("\u001B[31m"),
   YELLOW("\u001B[33m"),
@@ -17,7 +17,9 @@ enum class Terminal (val code: String) {
     /**
      * Returns `str` prefixed using the `with` value and suffixed using `Terminal.RESET`
      */
-    fun wrap(str: String, with: Terminal): String { return "${with.code}${str}${RESET.code}" }
+    fun wrap(str: String, with: Terminal): String {
+      return "${with.code}${str}${RESET.code}"
+    }
 
     /**
      * Hacky way of clearing off the screen. Should be sufficient on even the crustiest terminals

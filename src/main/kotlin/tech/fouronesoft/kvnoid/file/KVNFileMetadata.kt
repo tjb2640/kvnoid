@@ -13,11 +13,11 @@ import kotlin.time.Instant
  * Represents metadata about a KVN file.
  * Also stores some "information", i.e. category and nametag.
  */
-class KVNFileMetadata (
+class KVNFileMetadata(
   val uuid: UUID = UUID.randomUUID(),
   val versionString: String = KVNFileReadWriter.WRITE_VERSION_STRING,
   val dateCreated: Instant = Clock.System.now(),
-  var dateModified: Instant = Clock.System.now(),
+  var dateModified: Instant = dateCreated,
   val category: ByteArray,
   val nametag: ByteArray,
   val keyDataLength: Int = 0,
@@ -36,8 +36,7 @@ class KVNFileMetadata (
             "File is not a KVN file"
           }
           return KVNFileReadWriter.parseMetadataFromBytes(
-            fileVersion = versionBytesToString(reader.readNBytes(4)),
-            restOfFile = reader
+            fileVersion = versionBytesToString(reader.readNBytes(4)), restOfFile = reader
           ).also { it.filePath = Paths.get(absPath) }
         }
       } catch (_: Exception) {

@@ -8,8 +8,7 @@ const val ZERO_BYTE: Byte = 0.toByte()
  * A way to store String data in memory in an obfuscated way
  */
 class ObfuscatedString(
-  initialValue: ByteArray = ByteArray(1),
-  overwriteInitialValueSource: Boolean = false
+  initialValue: ByteArray = ByteArray(1), overwriteInitialValueSource: Boolean = false
 ) {
 
   private val encryptionKey: AESGCMKey = AESGCMKey.temporaryKey(size = 128)
@@ -30,8 +29,7 @@ class ObfuscatedString(
   fun setValue(newValue: ByteArray, overwrite: Boolean = false): ObfuscatedString {
     this.value = this.encryptionKey.encrypt(newValue)
     this.length = newValue.size
-    if (overwrite)
-      for (i in 0..<newValue.size) newValue[i] = ZERO_BYTE
+    if (overwrite) for (i in 0..<newValue.size) newValue[i] = ZERO_BYTE
     return this
   }
 

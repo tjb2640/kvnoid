@@ -41,10 +41,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
       val keyBytes = factory.generateSecret(spec).encoded
 
       return AESGCMKey(
-        secretKey = SecretKeySpec(keyBytes, "AES"),
-        iv = iv,
-        salt = salt,
-        aad = aad
+        secretKey = SecretKeySpec(keyBytes, "AES"), iv = iv, salt = salt, aad = aad
       )
     }
 
@@ -105,9 +102,8 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
   fun encrypt(plaintext: ByteArray): ByteArray {
     val cipher = Cipher.getInstance(ALGO_XFORM_STRING)
     cipher.init(
-      Cipher.ENCRYPT_MODE,
-      this.secretKey,
-      GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv))
+      Cipher.ENCRYPT_MODE, this.secretKey, GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv)
+    )
     cipher.updateAAD(this.aad)
     return cipher.doFinal(plaintext)
   }
@@ -120,9 +116,8 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
   fun decrypt(ciphertext: ByteArray): ByteArray {
     val cipher = Cipher.getInstance(ALGO_XFORM_STRING)
     cipher.init(
-      Cipher.DECRYPT_MODE,
-      this.secretKey,
-      GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv))
+      Cipher.DECRYPT_MODE, this.secretKey, GCMParameterSpec(AAD_SIZE_BYTES * 8, this.iv)
+    )
     cipher.updateAAD(this.aad)
     return try {
       cipher.doFinal(ciphertext)
@@ -132,8 +127,7 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
   }
 
   fun serializeToBytes(): ByteArray {
-    val buf = ByteBuffer
-      .allocate(SALT_SIZE_BYTES + IV_SIZE_BYTES + AAD_SIZE_BYTES)
+    val buf = ByteBuffer.allocate(SALT_SIZE_BYTES + IV_SIZE_BYTES + AAD_SIZE_BYTES)
       .order(DataSerializationUtils.STANDARD_BYTE_ORDER)
     buf.put(this.iv).put(this.salt).put(this.aad)
     return buf.array()
