@@ -2,7 +2,7 @@ package tech.fouronesoft.kvnoid.cli.application
 
 import tech.fouronesoft.kvnoid.cli.Terminal
 import tech.fouronesoft.kvnoid.cli.GuaranteedDotfile
-import tech.fouronesoft.kvnoid.cli.KVNVaultBrowser
+import tech.fouronesoft.kvnoid.cli.VaultBrowser
 import tech.fouronesoft.kvnoid.cli.Vault
 import tech.fouronesoft.kvnoid.util.ObfuscatedString
 import java.nio.file.Paths
@@ -10,7 +10,7 @@ import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.system.exitProcess
 
-class KVNoidCLIApplication {
+class SimpleCLIApplication {
 
   data class CLIArgument(
     val name: String, val help: String, val example: String, val dotfile: GuaranteedDotfile
@@ -116,15 +116,23 @@ class KVNoidCLIApplication {
 
       val sb = StringBuilder()
       if (allowShortPassphrase) {
-        sb.appendLine(Terminal.wrap("!".repeat(44), Terminal.RED))
-        sb.appendLine(Terminal.wrap("Warning! Vault key length check is disabled.", Terminal.YELLOW))
-        sb.appendLine(Terminal.wrap("Normally, vault keys are required to be a", Terminal.YELLOW))
-        sb.appendLine(Terminal.wrap("minimum of 12 characters long. Be careful", Terminal.YELLOW))
-        sb.appendLine(Terminal.wrap("!".repeat(44), Terminal.RED))
+        sb.appendLine(Terminal.wrap("!".repeat(55), Terminal.RED))
+        sb.appendLine(Terminal.wrap("    ⚠\uFE0F Warning! Vault key length check is disabled. ⚠\uFE0F", Terminal.YELLOW))
+        sb.appendLine(Terminal.wrap("       Normally, vault keys are required to be a", Terminal.YELLOW))
+        sb.appendLine(Terminal.wrap("       minimum of 12 characters long. Be careful.", Terminal.YELLOW))
+        sb.appendLine(Terminal.wrap("              Press ENTER to acknowledge.", Terminal.YELLOW))
+        sb.appendLine(Terminal.wrap("!".repeat(55), Terminal.RED))
+        print(sb.toString())
+        System.console()?.readPassword() ?: readln()
+        Terminal.resetScreen(7)
+        sb.clear()
       }
-      sb.appendLine("\nEnter a ${Terminal.wrap("vault key", Terminal.YELLOW)} to *crypt files with.")
-      sb.appendLine(" Vault key management is up to you. If you used a key to encrypt an entry before, you'll need to use")
-      sb.appendLine(" the same vault key again to decrypt the same entry.")
+
+      sb.appendLine("Welcome to ${Terminal.wrap("KVNoid", Terminal.RED)}.\n")
+      sb.appendLine("Enter a ${Terminal.wrap("vault key", Terminal.YELLOW)} to encrypt entries with.\n")
+      sb.appendLine("${Terminal.GREY.code}Vault key management is up to you. If you used a key")
+      sb.appendLine("to encrypt an entry before, you'll need to use")
+      sb.appendLine("the same vault key again if you want to decrypt it.${Terminal.RESET.code}\n")
       print(sb.toString())
 
       while (true) {
@@ -159,7 +167,7 @@ class KVNoidCLIApplication {
     fun main(args: Array<String>) {
       val parsedArgs: Map<String, String> = parseArgs(args)
       val allowShortPassphrase = parsedArgs["allow-insecure-vault-key"]!!.trim().toBoolean()
-      KVNVaultBrowser(
+      VaultBrowser(
         Vault(
           vaultPath = Paths.get(parsedArgs["vault-location"]!!),
           vaultKey = promptAndCacheVaultKey(allowShortPassphrase).also { Terminal.resetScreen() })

@@ -23,8 +23,8 @@ class KVNFileReadWriter {
     const val WRITE_VERSION_STRING: String = "20260216"
     val WRITE_VERSION_BYTES: ByteArray = KVNFileData.versionStringToBytes(WRITE_VERSION_STRING)
     const val SIZE_BYTES_PADDING: Int = 4
-    const val BYTELIMIT_CATEGORY: Int = 16
-    const val BYTELIMIT_NAMETAG: Int = 16
+    const val BYTELIMIT_CATEGORY: Int = 128
+    const val BYTELIMIT_NAMETAG: Int = 128
     const val BYTELIMIT_V: Int = 2048
 
     fun parseMetadataFromBytes(

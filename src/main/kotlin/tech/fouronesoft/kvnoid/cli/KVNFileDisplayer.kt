@@ -5,14 +5,13 @@ import tech.fouronesoft.kvnoid.util.DataSerializationUtils
 
 // Pre-calculated static values that will be printed more often than calculated
 const val PADDING_TABOVER = "   "
-val DISPLAYER_INSTRUCTIONS = StringBuilder().apply {
-  append("${PADDING_TABOVER}${Terminal.wrap("'q'", Terminal.RED)}: quit window\n")
-  append("${PADDING_TABOVER}${Terminal.wrap("'ENTER / n #'", Terminal.GREEN)}: forward # (default 1)\n")
-  append("${PADDING_TABOVER}${Terminal.wrap("'b #'", Terminal.GREEN)}: back # (default 1)\n")
-  append("${PADDING_TABOVER}${Terminal.wrap("'p #'", Terminal.BLUE)}: goto #\n")
-  append("${PADDING_TABOVER}${Terminal.wrap("'s'", Terminal.YELLOW)}: jump to start\n")
-  append("${PADDING_TABOVER}${Terminal.wrap("'e'", Terminal.YELLOW)}: jump to end\n")
-}.toString()
+val DISPLAYER_HELP_TEXT =
+  "${PADDING_TABOVER}${Terminal.wrap("'q'", Terminal.RED)}: quit window\n" +
+  "${PADDING_TABOVER}${Terminal.wrap("'ENTER / n #'", Terminal.GREEN)}: forward # (default 1)\n" +
+  "${PADDING_TABOVER}${Terminal.wrap("'b #'", Terminal.GREEN)}: back # (default 1)\n" +
+  "${PADDING_TABOVER}${Terminal.wrap("'p #'", Terminal.BLUE)}: goto #\n" +
+  "${PADDING_TABOVER}${Terminal.wrap("'s'", Terminal.YELLOW)}: jump to start\n" +
+  "${PADDING_TABOVER}${Terminal.wrap("'e'", Terminal.YELLOW)}: jump to end"
 
 /**
  * Wraps logic for viewing a `KVNFileData` model.
@@ -37,19 +36,19 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
     val strCreated = kvnFile.metadata.dateCreated.toString()
     val strModified = kvnFile.metadata.dateModified.toString()
     strMetadataHeader = StringBuilder().append("${Terminal.wrap("KVN", Terminal.RED)} :: ")
-      .appendLine(Terminal.wrap("${kvnFile.metadata.uuid}", Terminal.GREEN))
-      .appendLine(":: Category: '${Terminal.wrap(strCategory, Terminal.YELLOW)}' ")
-      .appendLine(":: Nametag:  '${Terminal.wrap(strNametag, Terminal.YELLOW)}' ")
+      .appendLine(Terminal.wrap("${kvnFile.metadata.uuid}", Terminal.GREY))
+      .appendLine(":: Category: [${Terminal.wrap(strCategory, Terminal.GREEN)}] ")
+      .appendLine(":: Nametag:  [${Terminal.wrap(strNametag, Terminal.BLUE)}] ")
       .appendLine(":: Created:  '${Terminal.wrap(strCreated, Terminal.YELLOW)}' ")
       .appendLine(":: Modified: '${Terminal.wrap(strModified, Terminal.YELLOW)}'").toString()
   }
 
   /**
-   * Displays the pre-calculated `DISPLAYER_INSTRUCTIONS` on-screen and displays a "command" prompt to the user.
+   * Displays the pre-calculated `DISPLAYER_HELP_TEXT` on-screen and displays a "command" prompt to the user.
    */
   fun drawInstructionalPrompt() {
     print(
-      StringBuilder("\n").appendLine(DISPLAYER_INSTRUCTIONS).append("  ╰─> command: ")
+      StringBuilder("\n").appendLine(DISPLAYER_HELP_TEXT).append("\n  ╰─> command: ")
     )
   }
 

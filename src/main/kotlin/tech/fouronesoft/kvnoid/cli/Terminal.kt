@@ -25,9 +25,10 @@ enum class Terminal(val code: String) {
      * Hacky way of clearing off the screen. Should be sufficient on even the crustiest terminals
      */
     fun resetScreen(lines: Int = 64) {
-      print("\u001B[${lines}A")
-      IntRange(0, lines.coerceAtLeast(0)).forEach { _ -> println(CLEAR_LINE.code) }
-      print(CLEAR_TO_TOP.code)
+      val overwriteCount = lines.coerceAtLeast(0)
+      print("\u001B[${overwriteCount}A") // Up
+      print("${CLEAR_LINE.code}\n".repeat(overwriteCount)) // Down
+      print("${CLEAR_TO_TOP.code}${RESET.code}") // Back around
     }
   }
 }

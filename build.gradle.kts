@@ -7,7 +7,7 @@ group = "tech.fouronesoft"
 version = "1.0-SNAPSHOT"
 
 application {
-  mainClass.set("tech.fouronesoft.kvnoid.cli.application.KVNoidCLIApplication")
+  mainClass.set("tech.fouronesoft.kvnoid.cli.application.SimpleCLIApplication")
 }
 
 repositories {
