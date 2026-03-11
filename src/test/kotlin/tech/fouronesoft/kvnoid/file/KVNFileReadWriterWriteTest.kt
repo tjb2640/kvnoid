@@ -25,7 +25,7 @@ class KVNFileReadWriterWriteTest {
     val kvnFileData: KVNFileData = TestDataProvider.generateDecryptedKVNData(KVNFileReadWriter.WRITE_VERSION_STRING)
     val fakeOutputStream = BufferedOutputStream(BufferedOutputStream.nullOutputStream())
 
-    kvnFileData.keyData = null
+    kvnFileData.encKeyValue = null
     assertThrows<RuntimeException>("Should throw on null keyData") {
       KVNFileReadWriter.writeToDisk(kvnFileData, fakeOutputStream)
     }
@@ -90,16 +90,16 @@ class KVNFileReadWriterWriteTest {
       lenNametag
     )
     assertEquals(
-      kvnFileData.keyData!!.serializeToBytes().size,
+      kvnFileData.encKeyValue!!.serializeToBytes().size,
       lenKeyData
     )
-    val inputBytes = ByteArray(kvnFileData.decryptedV!!.getLength())
-    kvnFileData.decryptedV!!.getProvider().use { provider ->
+    val inputBytes = ByteArray(kvnFileData.decryptedValue!!.getLength())
+    kvnFileData.decryptedValue!!.getProvider().use { provider ->
       provider.get().forEachIndexed { index, ch ->
         inputBytes[index] = ch.code.toByte()
       }
       assertEquals(
-        kvnFileData.keyData!!.encrypt(inputBytes).size,
+        kvnFileData.encKeyValue!!.encrypt(inputBytes).size,
         lenEncryptedV
       )
     }
@@ -120,11 +120,11 @@ class KVNFileReadWriterWriteTest {
 
     // Body content
     assertContentEquals(
-      kvnFileData.keyData!!.serializeToBytes(),
+      kvnFileData.encKeyValue!!.serializeToBytes(),
       outputReader.readNBytes(lenKeyData)
     )
     assertContentEquals(
-      kvnFileData.keyData!!.encrypt(inputBytes),
+      kvnFileData.encKeyValue!!.encrypt(inputBytes),
       outputReader.readNBytes(lenEncryptedV)
     )
     assertHasNullPaddingHere()

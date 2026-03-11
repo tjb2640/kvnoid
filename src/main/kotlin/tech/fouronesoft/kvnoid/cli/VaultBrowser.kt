@@ -46,13 +46,13 @@ class VaultBrowser(val vault: Vault) {
       .append("${Terminal.wrap(" |", Terminal.GREY)} ").append(
         "${
           Terminal.wrap(
-            DataSerializationUtils.byteArrayToUTF8StringLE(metadata.category), Terminal.GREEN
+            String(metadata.decryptedCategory!!.getProvider().get()), Terminal.GREEN
           )
         } "
       ).append(Terminal.wrap("@ ", Terminal.GREY)).appendLine(
         "${
           Terminal.wrap(
-            DataSerializationUtils.byteArrayToUTF8StringLE(metadata.nametag), Terminal.BLUE
+            String(metadata.decryptedNametag!!.getProvider().get()), Terminal.BLUE
           )
         } "
       ).appendLine(Terminal.wrap("      |  UUID:     ${metadata.uuid}", Terminal.GREY))
@@ -96,9 +96,9 @@ class VaultBrowser(val vault: Vault) {
         eidToUUID[foundEntry.eid] = metadata.uuid
 
         // Would like to associate a list of nametags to their specific categories. Pairs will be unique
-        val categoryString = DataSerializationUtils.byteArrayToUTF8StringLE(metadata.category).lowercase()
+        val categoryString = String(metadata.decryptedCategory!!.getProvider().get()).lowercase()
         if (categoryString !in categoryToNametagIndex) categoryToNametagIndex[categoryString] = mutableSetOf()
-        categoryToNametagIndex[categoryString]!!.add(DataSerializationUtils.byteArrayToUTF8StringLE(metadata.nametag))
+        categoryToNametagIndex[categoryString]!!.add(String(metadata.decryptedNametag!!.getProvider().get()))
       }
     }
   }
@@ -133,7 +133,7 @@ class VaultBrowser(val vault: Vault) {
    * (A KVN file's decryptedV should never be empty, so if it turns up as such it is our sign the file is "bad.")
    */
   private fun markBadCrypto(eid: Int, fileData: KVNFileData): Boolean {
-    if ((fileData.decryptedV?.getLength() ?: 0) == 0) {
+    if ((fileData.decryptedValue?.getLength() ?: 0) == 0) {
       badCryptoEid.add(eid)
       promptFeedback = Terminal.wrap("Could not decrypt entry. Wrong vault key or bad data?", Terminal.BLUE)
       return true
@@ -266,9 +266,13 @@ class VaultBrowser(val vault: Vault) {
       vault.createEntry(
         KVNFileData(
           metadata = KVNFileMetadata(
-            category = inputCategory.toByteArray(DataSerializationUtils.STANDARD_CHARSET),
-            nametag = inputNametag.toByteArray(DataSerializationUtils.STANDARD_CHARSET)
-          ), decryptedV = obfuscatedValue
+            decryptedCategory = ObfuscatedString(
+              initialValue = inputCategory.toByteArray(DataSerializationUtils.STANDARD_CHARSET),
+              overwriteInitialValueSource = true),
+            decryptedNametag = ObfuscatedString(
+              initialValue = inputNametag.toByteArray(DataSerializationUtils.STANDARD_CHARSET),
+              overwriteInitialValueSource = true)
+          ), decryptedValue = obfuscatedValue
         )
       )
       return true
@@ -296,10 +300,10 @@ class VaultBrowser(val vault: Vault) {
     Terminal.resetScreen()
     println(Terminal.wrap("Warning!", Terminal.RED) + " you are about to delete this entry:\n\n" +
         " - Category: [${Terminal.wrap(
-          str = DataSerializationUtils.byteArrayToUTF8StringLE(metadata.category),
+          str = String(metadata.decryptedCategory!!.getProvider().get()),
           with = Terminal.GREEN)}]\n" +
         " - Nametag:  [${Terminal.wrap(
-          str = DataSerializationUtils.byteArrayToUTF8StringLE(metadata.nametag),
+          str = String(metadata.decryptedNametag!!.getProvider().get()),
           with = Terminal.BLUE)}]\n" +
         " - Created:  ${Terminal.wrap(
           str = metadata.dateCreated.toString(),

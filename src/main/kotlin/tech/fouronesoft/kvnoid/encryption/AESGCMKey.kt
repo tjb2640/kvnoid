@@ -60,8 +60,6 @@ class AESGCMKey(val secretKey: SecretKeySpec, val iv: ByteArray, val salt: ByteA
 
     /**
      * Load a key into memory from a KVN file's serialized key bytes.
-     * This assumes that the bytes are organized according to spec
-     * TODO ^
      *
      * @param passphrase: key passphrase to initialize with
      * @param bytes: key data in packed bytes - should be IV, salt, then AAD

@@ -1,7 +1,6 @@
 package tech.fouronesoft.kvnoid.cli
 
 import tech.fouronesoft.kvnoid.file.KVNFileData
-import tech.fouronesoft.kvnoid.util.DataSerializationUtils
 
 // Pre-calculated static values that will be printed more often than calculated
 const val PADDING_TABOVER = "   "
@@ -26,13 +25,13 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
 
   var displaying: Boolean = true
   var windowPosition = 0
-  val decryptedVLength: Int = kvnFile.decryptedV!!.getLength()
+  val decryptedVLength: Int = kvnFile.decryptedValue!!.getLength()
   val strMetadataHeader: String
 
   init {
-    // Header data is pre-calculated once, done in init block because it needs data from the kvnFile.
-    val strNametag = kvnFile.metadata.nametag.toString(DataSerializationUtils.STANDARD_CHARSET)
-    val strCategory = kvnFile.metadata.category.toString(DataSerializationUtils.STANDARD_CHARSET)
+    // Data is pre-calculated once, done in init block because it needs data from the kvnFile.
+    val strNametag = String(kvnFile.metadata.decryptedNametag!!.getProvider().get())
+    val strCategory = String(kvnFile.metadata.decryptedCategory!!.getProvider().get())
     val strCreated = kvnFile.metadata.dateCreated.toString()
     val strModified = kvnFile.metadata.dateModified.toString()
     strMetadataHeader = StringBuilder().append("${Terminal.wrap("KVN", Terminal.RED)} :: ")
@@ -125,7 +124,7 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
    *
    * @param windowSize Int representing the size of the window. Set to `0` to dump entire value on screen.
    */
-  fun displayValueOnScreen(windowSize: Int = 9.coerceIn(0, kvnFile.decryptedV!!.getLength() / 2)) {
+  fun displayValueOnScreen(windowSize: Int = 9.coerceIn(0, kvnFile.decryptedValue!!.getLength() / 2)) {
     // A window size of 0 means we just want to dump the value in the terminal,
     // we don't need any special controls
     if (windowSize == 0) {
@@ -133,7 +132,7 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
       println(strMetadataHeader)
 
       print(Terminal.YELLOW.code)
-      kvnFile.decryptedV!!.getProvider().use { provider -> provider.get().forEach { c -> print(c) } }
+      kvnFile.decryptedValue!!.getProvider().use { provider -> provider.get().forEach { c -> print(c) } }
       print("${Terminal.RESET.code}\n\n (press Enter to close view)")
 
       System.console()?.readPassword() ?: readln()
@@ -151,7 +150,7 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
       // Print characters out here individually
       print(Terminal.YELLOW.code)
       print(PADDING_TABOVER)
-      kvnFile.decryptedV!!.getProvider().use { provider ->
+      kvnFile.decryptedValue!!.getProvider().use { provider ->
         val decryptedValue: CharArray = provider.get()
         IntRange(windowPosition, windowPosition + windowSize - 1).forEach { i ->
           print(' '.takeIf { i >= decryptedVLength } ?: decryptedValue[i])

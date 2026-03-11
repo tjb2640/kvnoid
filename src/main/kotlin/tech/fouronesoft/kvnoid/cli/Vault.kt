@@ -39,7 +39,9 @@ class Vault(val vaultPath: Path, val vaultKey: ObfuscatedString) {
    * Index metadata from the file at this path, return Boolean success
    */
   private fun indexEntryAt(path: Path): Boolean {
-    val metadata = KVNFileMetadata.readFromAbsolutePath(path.absolutePathString()) ?: return false
+    val metadata = KVNFileMetadata.readFromAbsolutePath(
+      absPath = path.absolutePathString(),
+      vaultKey = vaultKey) ?: return false
     uuidToMetadata[metadata.uuid] = metadata
     uuidToFilepath[metadata.uuid] = path.toAbsolutePath()
     return true

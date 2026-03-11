@@ -28,7 +28,7 @@ class KVNFileReadWriter {
     const val BYTELIMIT_V: Int = 2048
 
     fun parseMetadataFromBytes(
-      fileVersion: String, restOfFile: BufferedInputStream
+      fileVersion: String, restOfFile: BufferedInputStream, vaultKey: ObfuscatedString
     ): KVNFileMetadata {
 
       val crc = CRC32()
@@ -61,16 +61,14 @@ class KVNFileReadWriter {
       val bytesDateCreated = readNBytes(Long.SIZE_BYTES)
       val bytesDateModified = readNBytes(Long.SIZE_BYTES)
       readNBytes(24) // Skip 24 reserved bytes
-      val lenCategory: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
-      val lenNametag: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
-      val lenKeyData: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
-      val lenEncryptedV: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenCategoryKey: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenEncryptedCategory: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenNametagKey: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenEncryptedNametag: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenValueKey: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
+      val lenEncryptedValue: Int = DataSerializationUtils.byteArrayToIntLE(readNBytes(Int.SIZE_BYTES))
       readNBytes(52) // Skip 52 reserved bytes
-      val bytesCategory = readNBytes(lenCategory)
-      val bytesNametag = readNBytes(lenNametag)
-      val crcFromFile: Long = DataSerializationUtils.byteArrayToLongLE(
-        restOfFile.readNBytes(Long.SIZE_BYTES)
-      )
+      val crcFromFile: Long = DataSerializationUtils.byteArrayToLongLE(restOfFile.readNBytes(Long.SIZE_BYTES))
       bytesRead += Long.SIZE_BYTES
 
       // Verify CRC
@@ -78,6 +76,22 @@ class KVNFileReadWriter {
         "CRC mismatch: file specified '${crcFromFile.toHexString()}', calculated '${crc.value.toHexString()}'"
       }
       verifyNullPadding()
+
+      // Read category
+      val encKeyCategory = vaultKey.getProvider().use { provider ->
+        AESGCMKey.fromSerializedBytes(
+          passphrase = provider.get(),
+          bytes = readNBytes(lenCategoryKey)) }
+      val decryptedCategory = ObfuscatedString(initialValue = encKeyCategory.decrypt(
+        readNBytes(lenEncryptedCategory)), overwriteInitialValueSource = true)
+
+      // Read nametag
+      val encKeyNametag = vaultKey.getProvider().use { provider ->
+        AESGCMKey.fromSerializedBytes(
+          passphrase = provider.get(),
+          bytes = readNBytes(lenNametagKey)) }
+      val decryptedNametag = ObfuscatedString(initialValue = encKeyNametag.decrypt(
+        readNBytes(lenEncryptedNametag)), overwriteInitialValueSource = true)
 
       return KVNFileMetadata(
         uuid = UUID(
@@ -87,13 +101,15 @@ class KVNFileReadWriter {
         versionString = fileVersion,
         dateCreated = Instant.fromEpochMilliseconds(DataSerializationUtils.byteArrayToLongLE(bytesDateCreated)),
         dateModified = Instant.fromEpochMilliseconds(DataSerializationUtils.byteArrayToLongLE(bytesDateModified)),
-        category = bytesCategory,
-        nametag = bytesNametag,
+        encKeyCategory = encKeyCategory,
+        decryptedCategory = decryptedCategory,
+        encKeyNametag = encKeyNametag,
+        decryptedNametag = decryptedNametag,
         // These are temporal, I calculate them for convenience, but will need to reread the metadata from the file
         // whenever the category or nametag properties change after a disk write.
-        keyDataLength = lenKeyData,
-        keyDataPosition = bytesRead,
-        encryptedVLength = lenEncryptedV
+        encKeyValueLength = lenValueKey,
+        encKeyValuePosition = bytesRead,
+        encryptedValueLength = lenEncryptedValue
       )
     }
 
@@ -106,12 +122,12 @@ class KVNFileReadWriter {
     ): KVNFileData {
 
       // Skip number of bytes read up to this point
-      buffer.skipNBytes(metadata.keyDataPosition.toLong())
+      buffer.skipNBytes(metadata.encKeyValuePosition.toLong())
 
-      val keyData = AESGCMKey.fromSerializedBytes(passphrase, buffer.readNBytes(metadata.keyDataLength))
-      keyData.decrypt(buffer.readNBytes(metadata.encryptedVLength)).also { decryptedBlock ->
+      val keyData = AESGCMKey.fromSerializedBytes(passphrase, buffer.readNBytes(metadata.encKeyValueLength))
+      keyData.decrypt(buffer.readNBytes(metadata.encryptedValueLength)).also { decryptedBlock ->
         return KVNFileData(
-          metadata = metadata, keyData = keyData, decryptedV = ObfuscatedString(
+          metadata = metadata, encKeyValue = keyData, decryptedValue = ObfuscatedString(
             initialValue = decryptedBlock, overwriteInitialValueSource = true
           )
         )
@@ -130,48 +146,68 @@ class KVNFileReadWriter {
       contents: KVNFileData, writer: BufferedOutputStream
     ) {
 
-      requireNotNull(contents.keyData) { "Key data was not initialized" }
-      requireNotNull(contents.decryptedV) { "No value to encrypt" }
-      require(contents.metadata.category.size <= BYTELIMIT_CATEGORY) {
-        "Category is limited to $BYTELIMIT_CATEGORY bytes in size; currently ${contents.metadata.category.size}"
+      requireNotNull(contents.encKeyValue) { "Key data was not initialized" }
+      requireNotNull(contents.decryptedValue) { "No value to encrypt" }
+      require(contents.metadata.decryptedCategory!!.getLength() <= BYTELIMIT_CATEGORY) {
+        "Category is limited to $BYTELIMIT_CATEGORY bytes in size; currently ${contents.metadata.decryptedCategory!!.getLength()}"
       }
-      require(contents.metadata.nametag.size <= BYTELIMIT_NAMETAG) {
-        "Name tag is limited to $BYTELIMIT_NAMETAG bytes in size; currently ${contents.metadata.nametag.size}"
+      require(contents.metadata.decryptedNametag!!.getLength() <= BYTELIMIT_NAMETAG) {
+        "Name tag is limited to $BYTELIMIT_NAMETAG bytes in size; currently ${contents.metadata.decryptedNametag!!.getLength()}"
       }
-      require(contents.decryptedV!!.getLength() <= BYTELIMIT_V) {
-        "Stored value is limited to $BYTELIMIT_V bytes in size; currently ${contents.decryptedV!!.getLength()}"
+      require(contents.decryptedValue!!.getLength() <= BYTELIMIT_V) {
+        "Stored value is limited to $BYTELIMIT_V bytes in size; currently ${contents.decryptedValue!!.getLength()}"
       }
 
       // Encryption action
-      val serializedKeyBytes: ByteArray = contents.keyData!!.serializeToBytes()
-      val encryptedV: ByteArray = contents.decryptedV!!.getProvider().use { provider ->
+      val serializedCategoryKeyBytes: ByteArray = contents.metadata.encKeyCategory!!.serializeToBytes()
+      val serializedNametagKeyBytes: ByteArray = contents.metadata.encKeyNametag!!.serializeToBytes()
+      val serializedValueKeyBytes: ByteArray = contents.encKeyValue!!.serializeToBytes()
+
+      val encryptedCategory: ByteArray = contents.metadata.decryptedCategory!!.getProvider().use { provider ->
         val inputBytes = ByteArray(provider.get().size)
-        provider.get().forEachIndexed { index, ch ->
-          inputBytes[index] = ch.code.toByte()
+        provider.get().forEachIndexed { index, ch -> inputBytes[index] = ch.code.toByte() }
+        contents.metadata.encKeyCategory!!.encrypt(inputBytes).also {
+          inputBytes.forEachIndexed { index, _ -> inputBytes[index] = 0.toByte() }
         }
-        contents.keyData!!.encrypt(inputBytes).also {
-          inputBytes.forEachIndexed { index, _ ->
-            inputBytes[index] = 0.toByte()
-          }
+      }
+
+      val encryptedNametag: ByteArray = contents.metadata.decryptedNametag!!.getProvider().use { provider ->
+        val inputBytes = ByteArray(provider.get().size)
+        provider.get().forEachIndexed { index, ch -> inputBytes[index] = ch.code.toByte() }
+        contents.metadata.encKeyNametag!!.encrypt(inputBytes).also {
+          inputBytes.forEachIndexed { index, _ -> inputBytes[index] = 0.toByte() }
+        }
+      }
+
+      val encryptedValue: ByteArray = contents.decryptedValue!!.getProvider().use { provider ->
+        val inputBytes = ByteArray(provider.get().size)
+        provider.get().forEachIndexed { index, ch -> inputBytes[index] = ch.code.toByte() }
+        contents.encKeyValue!!.encrypt(inputBytes).also {
+          inputBytes.forEachIndexed { index, _ -> inputBytes[index] = 0.toByte() }
         }
       }
 
       // Lengths (ints) as specified in the header spec
-      val lenCategory: Int = contents.metadata.category.size
-      val lenNametag: Int = contents.metadata.nametag.size
-      val lenKeyBytes: Int = serializedKeyBytes.size
-      val lenEV: Int = encryptedV.size
+      val lenCategoryKey: Int = serializedCategoryKeyBytes.size
+      val lenNametagKey: Int = serializedNametagKeyBytes.size
+      val lenValueKey: Int = serializedValueKeyBytes.size
+      val lenEncryptedCategory: Int = encryptedCategory.size
+      val lenEncryptedNametag: Int = encryptedNametag.size
+      val lenEncryptedValue: Int = encryptedValue.size
 
       // Calc lengths of both sections
       val lenHeader = (4 + 4) +   // magic bytes and version string
           (2 * Long.SIZE_BYTES) + // UUID bytes
           (2 * Long.SIZE_BYTES) + // MS dates (longs)
           24 +                    // Reserved 24
-          (4 * Int.SIZE_BYTES) +  // All written length values (ints)
+          (6 * Int.SIZE_BYTES) +  // All written length values (ints)
           52 +                    // Reserved 52
-          lenCategory + lenNametag + Long.SIZE_BYTES +       // CRC32
+          Long.SIZE_BYTES +       // CRC32
           SIZE_BYTES_PADDING
-      val lenBody = lenKeyBytes + lenEV + SIZE_BYTES_PADDING
+      val lenBody = lenCategoryKey + lenEncryptedCategory +
+          lenNametagKey + lenEncryptedNametag +
+          lenValueKey + lenEncryptedValue +
+          SIZE_BYTES_PADDING
 
       // Helpers
       val crc = CRC32()
@@ -205,19 +241,23 @@ class KVNFileReadWriter {
       writeLong(contents.metadata.dateCreated.toEpochMilliseconds())
       writeLong(contents.metadata.dateModified.toEpochMilliseconds())
       writeBytes(ByteArray(24)) // Reserved
-      writeInt(lenCategory)
-      writeInt(lenNametag)
-      writeInt(lenKeyBytes)
-      writeInt(lenEV)
+      writeInt(lenCategoryKey)
+      writeInt(lenEncryptedCategory)
+      writeInt(lenNametagKey)
+      writeInt(lenEncryptedNametag)
+      writeInt(lenValueKey)
+      writeInt(lenEncryptedValue)
       writeBytes(ByteArray(52)) // Reserved
-      writeBytes(contents.metadata.category)
-      writeBytes(contents.metadata.nametag)
       writeLong(crc.value)
       writeBytes(ByteArray(SIZE_BYTES_PADDING))
 
       // Write body content (key bytes and encrypted data)
-      writeBytes(serializedKeyBytes)
-      writeBytes(encryptedV)
+      writeBytes(serializedCategoryKeyBytes)
+      writeBytes(encryptedCategory)
+      writeBytes(serializedNametagKeyBytes)
+      writeBytes(encryptedNametag)
+      writeBytes(serializedValueKeyBytes)
+      writeBytes(encryptedValue)
       writeBytes(ByteArray(SIZE_BYTES_PADDING))
       if ((lenHeader + lenBody) % 4 != 0) {
         writer.write(ByteArray(4 - ((lenHeader + lenBody) % 4)))

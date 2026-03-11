@@ -15,7 +15,9 @@ import kotlin.time.Clock
  * Should be agnostic to file format versioning
  */
 class KVNFileData(
-  var metadata: KVNFileMetadata, var keyData: AESGCMKey? = null, var decryptedV: ObfuscatedString? = null
+  var metadata: KVNFileMetadata,
+  var encKeyValue: AESGCMKey? = null,
+  var decryptedValue: ObfuscatedString? = null
 ) {
 
   /**
@@ -27,7 +29,12 @@ class KVNFileData(
    * @passphrase passphrase (some kind of plaintext master key) to encrypt the file with
    */
   fun writeToDisk(path: Path, passphrase: CharArray) {
-    this.keyData = this.keyData ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
+    this.metadata.encKeyCategory = this.metadata.encKeyCategory
+      ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
+    this.metadata.encKeyNametag = this.metadata.encKeyNametag
+      ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
+    this.encKeyValue = this.encKeyValue
+      ?: AESGCMKey.fromNewPlaintextPassphrase(passphrase)
     this.metadata.dateModified = Clock.System.now()
 
     val absPath = path.toAbsolutePath()

@@ -32,17 +32,17 @@ class TestDataProvider {
         dateModified = Instant.fromEpochMilliseconds(9001),
         category = DataSerializationUtils.stringToUTF8ByteArray(dummyCategory),
         nametag = DataSerializationUtils.stringToUTF8ByteArray(dummyNametag),
-        keyDataLength = GeneratedTestKey.instance.serializeToBytes().size,
-        keyDataPosition = -1,
-        encryptedVLength = -1
+        encKeyValueLength = GeneratedTestKey.instance.serializeToBytes().size,
+        encKeyValuePosition = -1,
+        encryptedValueLength = -1
       )
     }
 
     fun generateDecryptedKVNData(versionString: String): KVNFileData {
       return KVNFileData(
         metadata = generateKVNMetadata(versionString),
-        keyData = GeneratedTestKey.instance,
-        decryptedV = ObfuscatedString(DataSerializationUtils.stringToUTF8ByteArray(dummyDecryptedV))
+        encKeyValue = GeneratedTestKey.instance,
+        decryptedValue = ObfuscatedString(DataSerializationUtils.stringToUTF8ByteArray(dummyDecryptedV))
       )
     }
   }
