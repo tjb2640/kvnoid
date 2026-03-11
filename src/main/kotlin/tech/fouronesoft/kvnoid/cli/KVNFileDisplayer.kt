@@ -46,9 +46,9 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
    * Displays the pre-calculated `DISPLAYER_HELP_TEXT` on-screen and displays a "command" prompt to the user.
    */
   fun drawInstructionalPrompt() {
-    print(
-      StringBuilder("\n").appendLine(DISPLAYER_HELP_TEXT).append("\n  ╰─> command: ")
-    )
+    print("\n" +
+        "${DISPLAYER_HELP_TEXT}\n\n" +
+        "   ╰─> command " + Terminal.wrap("(n)", Terminal.GREY) + ": ")
   }
 
   /**
@@ -133,7 +133,7 @@ class KVNFileDisplayer(val kvnFile: KVNFileData) {
 
       print(Terminal.YELLOW.code)
       kvnFile.decryptedValue!!.getProvider().use { provider -> provider.get().forEach { c -> print(c) } }
-      print("${Terminal.RESET.code}\n\n (press Enter to close view)")
+      print("${Terminal.RESET.code}\n\n  ╰─> Press ENTER to close view. ")
 
       System.console()?.readPassword() ?: readln()
       Terminal.resetScreen(99)

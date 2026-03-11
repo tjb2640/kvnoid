@@ -6,6 +6,7 @@ import tech.fouronesoft.kvnoid.file.KVNFileReadWriter
 import tech.fouronesoft.kvnoid.util.DataSerializationUtils
 import tech.fouronesoft.kvnoid.util.ObfuscatedString
 import java.util.UUID
+import kotlin.io.println
 import kotlin.math.ceil
 import kotlin.text.appendLine
 
@@ -43,19 +44,21 @@ class VaultBrowser(val vault: Vault) {
   private data class VaultEntry(
     val metadata: KVNFileMetadata, val eid: Int, val displayLine: String = StringBuilder()
       // "EID" is printed in drawList() for state-based colour; the rest of this is pre-calculated here
-      .append("${Terminal.wrap(" |", Terminal.GREY)} ").append(
-        "${
-          Terminal.wrap(
-            String(metadata.decryptedCategory!!.getProvider().get()), Terminal.GREEN
-          )
-        } "
-      ).append(Terminal.wrap("@ ", Terminal.GREY)).appendLine(
-        "${
-          Terminal.wrap(
-            String(metadata.decryptedNametag!!.getProvider().get()), Terminal.BLUE
-          )
-        } "
-      ).appendLine(Terminal.wrap("      |  UUID:     ${metadata.uuid}", Terminal.GREY))
+      .append(
+        Terminal.wrap(
+          str = "$eid".padStart(5, ' '),
+          with = Terminal.RED
+            .takeIf { metadata.decryptedCategory!!.getLength() == 0 || metadata.decryptedNametag!!.getLength() == 0 }
+            ?: Terminal.RESET))
+      .append("${Terminal.wrap(" |", Terminal.GREY)} ")
+      .append(
+        Terminal.wrap("???", Terminal.RED).takeIf{ metadata.decryptedCategory!!.getLength() == 0 }
+          ?: Terminal.wrap(String(metadata.decryptedCategory!!.getProvider().get()), Terminal.GREEN))
+      .append(Terminal.wrap(" @ ", Terminal.GREY))
+      .appendLine(
+        Terminal.wrap("???", Terminal.RED).takeIf{ metadata.decryptedNametag!!.getLength() == 0 }
+          ?: Terminal.wrap(String(metadata.decryptedNametag!!.getProvider().get()), Terminal.BLUE))
+      .appendLine(Terminal.wrap("      |  UUID:     ${metadata.uuid}", Terminal.GREY))
       .appendLine(Terminal.wrap("      |  Created:  ${metadata.dateCreated}", Terminal.GREY))
       .appendLine(Terminal.wrap("      |  Modified: ${metadata.dateModified}", Terminal.GREY))
       .append(Terminal.wrap("------+------------------------------------------------", Terminal.GREY))
@@ -72,7 +75,6 @@ class VaultBrowser(val vault: Vault) {
   private val entries: MutableMap<UUID, VaultEntry> = mutableMapOf()
   private val eidToUUID: MutableMap<Int, UUID> = mutableMapOf()
   private val categoryToNametagIndex: MutableMap<String, MutableSet<String>> = mutableMapOf()
-  private val badCryptoEid: MutableSet<Int> = mutableSetOf()
 
   init {
     indexEntriesHere()
@@ -87,7 +89,6 @@ class VaultBrowser(val vault: Vault) {
     entries.clear()
     eidToUUID.clear()
     categoryToNametagIndex.clear()
-    badCryptoEid.clear()
 
     // Loop all entries in the vault and map out the info we need here
     vault.getEntries().values.sortedBy { v -> v.dateCreated }.forEach { metadata ->
@@ -132,13 +133,8 @@ class VaultBrowser(val vault: Vault) {
    *
    * (A KVN file's decryptedV should never be empty, so if it turns up as such it is our sign the file is "bad.")
    */
-  private fun markBadCrypto(eid: Int, fileData: KVNFileData): Boolean {
-    if ((fileData.decryptedValue?.getLength() ?: 0) == 0) {
-      badCryptoEid.add(eid)
-      promptFeedback = Terminal.wrap("Could not decrypt entry. Wrong vault key or bad data?", Terminal.BLUE)
-      return true
-    }
-    return false
+  private fun hasBadCrypto(eid: Int, fileData: KVNFileData): Boolean {
+    return (fileData.decryptedValue?.getLength() ?: 0) == 0
   }
 
   /**
@@ -233,7 +229,7 @@ class VaultBrowser(val vault: Vault) {
       kind = "category",
       sizeLimit = KVNFileReadWriter.BYTELIMIT_CATEGORY,
       promptColour = Terminal.GREEN
-    ).also { if (it.isBlank()) return false }
+    ).also { if (it.isBlank()) return false }.trim()
 
     // Nametag
     Terminal.resetScreen()
@@ -253,7 +249,7 @@ class VaultBrowser(val vault: Vault) {
       notIn = categoryToNametagIndex[inputCategory],
       sizeLimit = KVNFileReadWriter.BYTELIMIT_CATEGORY,
       promptColour = Terminal.BLUE
-    ).also { if (it.isBlank()) return false }
+    ).also { if (it.isBlank()) return false }.trim()
 
     // Encrypted value
     Terminal.resetScreen()
@@ -299,23 +295,25 @@ class VaultBrowser(val vault: Vault) {
 
     Terminal.resetScreen()
     println(Terminal.wrap("Warning!", Terminal.RED) + " you are about to delete this entry:\n\n" +
-        " - Category: [${Terminal.wrap(
-          str = String(metadata.decryptedCategory!!.getProvider().get()),
-          with = Terminal.GREEN)}]\n" +
-        " - Nametag:  [${Terminal.wrap(
-          str = String(metadata.decryptedNametag!!.getProvider().get()),
-          with = Terminal.BLUE)}]\n" +
+        " - Category: [${
+          Terminal.wrap("???", Terminal.RED).takeIf{ metadata.decryptedCategory!!.getLength() == 0 } 
+            ?: Terminal.wrap(String(metadata.decryptedCategory!!.getProvider().get()), Terminal.GREEN)}" +
+        "]\n" +
+        " - Nametag:  [${
+          Terminal.wrap("???", Terminal.RED).takeIf{ metadata.decryptedNametag!!.getLength() == 0 }
+            ?: Terminal.wrap(String(metadata.decryptedNametag!!.getProvider().get()), Terminal.BLUE)}" +
+        "]\n" +
         " - Created:  ${Terminal.wrap(
           str = metadata.dateCreated.toString(),
           with = Terminal.YELLOW)}\n" +
         " - Modified: ${Terminal.wrap(
           str = metadata.dateModified.toString(),
           with = Terminal.YELLOW)}\n\n" +
-        "If you want to do this, type " + Terminal.wrap("delete", Terminal.YELLOW) +
+        "If you want to do this, type " + Terminal.wrap("delete $eid", Terminal.YELLOW) +
         " and hit ENTER.")
-    print("\n  ╰─> Type ${Terminal.wrap("delete", Terminal.YELLOW)} to confirm deletion: ${Terminal.YELLOW.code}")
+    print("\n  ╰─> Type ${Terminal.wrap("delete $eid", Terminal.YELLOW)} to confirm deletion: ${Terminal.YELLOW.code}")
     readln().also {
-      if ("delete" != it) {
+      if ("delete $eid" != it) {
         promptFeedback = "Failed deletion confirmation."
         return false
       }
@@ -349,7 +347,10 @@ class VaultBrowser(val vault: Vault) {
       }
     }!!
 
-    if (markBadCrypto(eid, fileData)) return false
+    if (hasBadCrypto(eid, fileData)) {
+      promptFeedback = Terminal.wrap("Could not decrypt entry. Wrong vault key or bad data?", Terminal.BLUE)
+      return false
+    }
 
     KVNFileDisplayer(fileData).displayValueOnScreen(0.takeIf { doNotWindow } ?: 9)
     return true
@@ -379,16 +380,7 @@ class VaultBrowser(val vault: Vault) {
     val entriesIterator = entries.iterator()
     var i = 0
     while (i <= offsetEnd && entriesIterator.hasNext()) {
-      val thisEntry = entriesIterator.next()
-      if (i >= offsetStart) {
-        // We manually include EID here because it might be red, and we can't precalculate that like the rest of
-        // the entry's displayLine.
-        val eid = thisEntry.value.eid
-        println(
-          Terminal.wrap(
-          str = "$eid".padStart(5, ' '),
-          with = Terminal.RED.takeIf { badCryptoEid.contains(eid) } ?: Terminal.RESET) + thisEntry.value.displayLine)
-      }
+      if (i >= offsetStart) println(entriesIterator.next().value.displayLine)
       i++
     }
   }
@@ -397,18 +389,16 @@ class VaultBrowser(val vault: Vault) {
    * Breakout code for drawing the command prompt text
    */
   private fun drawPromptAndTakeInput() {
-    print(
-      StringBuilder()
-        .append("\n")
-        .appendLine(promptFeedback)
-        .appendLine("Type ${Terminal.wrap("'help'", Terminal.YELLOW)} for help or enter a command")
-        .append("\n  ╰─> command: ${Terminal.GREEN.code}")
-        .also { promptFeedback = "" })
+    print("\n" +
+        "${promptFeedback}\n" +
+        "Type ${Terminal.wrap("'help'", Terminal.YELLOW)} for help or enter a command\n" +
+        "   ╰─> command " + Terminal.wrap("(page++)", Terminal.GREY) + ": " + Terminal.GREEN.code)
+    promptFeedback = ""
   }
 
   fun run() {
     while (true) {
-      val pageCount: Int = ceil(1.0 * entries.count() / entriesPerPage).toInt()
+      val pageCount: Int = (ceil(1.0 * (entries.count()) / entriesPerPage).toInt()).coerceAtLeast(1)
 
       // Draw browser screen
       Terminal.resetScreen()
