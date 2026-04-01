@@ -12,6 +12,9 @@ import kotlin.text.appendLine
 
 // Value displayed when user runs "help"
 private val VAULTBROWSER_HELP_TEXT = "" +
+    // quit
+    Terminal.wrap("quit", Terminal.YELLOW) + " - e.g. " + Terminal.wrap("q", Terminal.GREEN) +
+    "\n╰─> Cleanly exit the program\n\n" +
     // window
     Terminal.wrap("window <EID>", Terminal.YELLOW) + " - e.g. " + Terminal.wrap("w 2", Terminal.GREEN) +
     "\n╰─> Display value in entry <EID> in a scrolling window\n\n" +
@@ -24,6 +27,9 @@ private val VAULTBROWSER_HELP_TEXT = "" +
     // count (entries per page)
     Terminal.wrap("count <PAGECOUNT>", Terminal.YELLOW) + " - e.g. " + Terminal.wrap("c 5", Terminal.GREEN) +
     "\n╰─> Change the number of entries shown per page\n\n" +
+    // filter
+    Terminal.wrap("filter <category|nametag|uuid> <VALUE>", Terminal.YELLOW) + " - e.g. " + Terminal.wrap("f c category snippet", Terminal.GREEN) +
+    "\n╰─> Filter entries. Blank options clears filter(s).\n\n" +
     // new
     Terminal.wrap("new", Terminal.YELLOW) + " - e.g. " + Terminal.wrap("n", Terminal.GREEN) +
     "\n╰─> Interactive prompt for entry creation\n\n" +
@@ -39,7 +45,17 @@ private val VAULTBROWSER_HELP_TEXT = "" +
  */
 class VaultBrowser(val vault: Vault) {
 
-  private var globalEid = 0
+  private var entriesPerPage: Int = 5
+  private var filterCategory: String = ""
+  private var filterNametag: String = ""
+  private var filterUUID: String = ""
+  private var lastEid: Int = 0
+  private var page: Int = 1
+  private var promptFeedback: String = "Vault initialized."
+
+  private val categoryToNametagIndex: MutableMap<String, MutableSet<String>> = mutableMapOf()
+  private val eidToUUID: MutableMap<Int, UUID> = mutableMapOf()
+  private val entries: MutableMap<UUID, VaultEntry> = mutableMapOf()
 
   private data class VaultEntry(
     val metadata: KVNFileMetadata, val eid: Int, val displayLine: String = StringBuilder()
@@ -65,17 +81,6 @@ class VaultBrowser(val vault: Vault) {
       .toString()
   )
 
-  var page: Int = 1
-  var entriesPerPage: Int = 5
-  var filterCategory: String = ""
-  var filterNametag: String = ""
-  var filterUUID: String = ""
-
-  var promptFeedback: String = "Vault initialized."
-  private val entries: MutableMap<UUID, VaultEntry> = mutableMapOf()
-  private val eidToUUID: MutableMap<Int, UUID> = mutableMapOf()
-  private val categoryToNametagIndex: MutableMap<String, MutableSet<String>> = mutableMapOf()
-
   init {
     indexEntriesHere()
   }
@@ -85,21 +90,32 @@ class VaultBrowser(val vault: Vault) {
    * TODO: potentially make this a more efficient process
    */
   private fun indexEntriesHere() {
-    globalEid = 0
+    lastEid = 0
     entries.clear()
     eidToUUID.clear()
     categoryToNametagIndex.clear()
 
     // Loop all entries in the vault and map out the info we need here
     vault.getEntries().values.sortedBy { v -> v.dateCreated }.forEach { metadata ->
-      VaultEntry(metadata = metadata, eid = (++globalEid)).also { foundEntry ->
-        entries[metadata.uuid] = foundEntry
-        eidToUUID[foundEntry.eid] = metadata.uuid
+      // Keep EID consistently incremented despite filtering
+      lastEid++
+      // Do filtering on category, nametag, uuid here if filter values are defined.
+      val categoryString = String(metadata.decryptedCategory!!.getProvider().get()).lowercase()
+      val nametagString = String(metadata.decryptedNametag!!.getProvider().get())
+      val uuid = metadata.uuid
+      val filterPass = (filterCategory.isBlank() || categoryString.contains(filterCategory)) &&
+          (filterNametag.isBlank() || nametagString.lowercase().contains(filterNametag.lowercase())) &&
+          (filterUUID.isBlank() || uuid.toString().lowercase().contains(filterUUID.lowercase()))
 
-        // Would like to associate a list of nametags to their specific categories. Pairs will be unique
-        val categoryString = String(metadata.decryptedCategory!!.getProvider().get()).lowercase()
-        if (categoryString !in categoryToNametagIndex) categoryToNametagIndex[categoryString] = mutableSetOf()
-        categoryToNametagIndex[categoryString]!!.add(String(metadata.decryptedNametag!!.getProvider().get()))
+      if (filterPass) {
+        VaultEntry(metadata = metadata, eid = (lastEid)).also { foundEntry ->
+          entries[metadata.uuid] = foundEntry
+          eidToUUID[foundEntry.eid] = metadata.uuid
+
+          // Would like to associate a list of nametags to their specific categories. Pairs will be unique
+          if (categoryString !in categoryToNametagIndex) categoryToNametagIndex[categoryString] = mutableSetOf()
+          categoryToNametagIndex[categoryString]!!.add(nametagString)
+        }
       }
     }
   }
@@ -133,7 +149,7 @@ class VaultBrowser(val vault: Vault) {
    *
    * (A KVN file's decryptedV should never be empty, so if it turns up as such it is our sign the file is "bad.")
    */
-  private fun hasBadCrypto(eid: Int, fileData: KVNFileData): Boolean {
+  private fun hasBadCrypto(fileData: KVNFileData): Boolean {
     return (fileData.decryptedValue?.getLength() ?: 0) == 0
   }
 
@@ -347,7 +363,7 @@ class VaultBrowser(val vault: Vault) {
       }
     }!!
 
-    if (hasBadCrypto(eid, fileData)) {
+    if (hasBadCrypto(fileData)) {
       promptFeedback = Terminal.wrap("Could not decrypt entry. Wrong vault key or bad data?", Terminal.BLUE)
       return false
     }
@@ -364,6 +380,19 @@ class VaultBrowser(val vault: Vault) {
     println("${left}${middle}${right}\n")
   }
 
+  private fun drawFilterText() {
+    if (!filterCategory.isBlank() || !filterNametag.isBlank() || !filterUUID.isBlank()) {
+      val builder: StringBuilder = StringBuilder()
+      if (!filterCategory.isBlank())
+        builder.append(" filter category: ").appendLine(Terminal.wrap(filterCategory, Terminal.GREEN))
+      if (!filterNametag.isBlank())
+        builder.append(" filter nametag:  ").appendLine(Terminal.wrap(filterNametag, Terminal.BLUE))
+      if (!filterUUID.isBlank())
+        builder.append(" filter UUID:     ").appendLine(Terminal.wrap(filterUUID, Terminal.GREY))
+      println(builder.toString())
+    }
+  }
+
   /**
    * Breakout code for drawing the paginated list of entries in the vault
    */
@@ -371,17 +400,19 @@ class VaultBrowser(val vault: Vault) {
     val offsetStart = (page - 1) * entriesPerPage
     val offsetEnd = ((page * entriesPerPage) - 1).coerceIn(0, (entries.count() - 1).coerceAtLeast(0))
 
-    // Page number and header at top
+    // Page number and header at top, plus filter information if user has those set
     drawHeaderText(right = "(page $page of $pageCount)")
+    drawFilterText()
     println("  EID " + Terminal.wrap("|", Terminal.GREY) + " Info" + "\n" +
         Terminal.wrap("------+------------------------------------------------", Terminal.GREY))
 
     // Iterate over the map in order as-is and print items on the selected page
     val entriesIterator = entries.iterator()
-    var i = 0
-    while (i <= offsetEnd && entriesIterator.hasNext()) {
-      if (i >= offsetStart) println(entriesIterator.next().value.displayLine)
-      i++
+    var entryOffset = 0
+    while (entryOffset <= offsetEnd && entriesIterator.hasNext()) {
+      val entry = entriesIterator.next()
+      if (entryOffset >= offsetStart) println(entry.value.displayLine)
+      entryOffset++
     }
   }
 
@@ -457,6 +488,27 @@ class VaultBrowser(val vault: Vault) {
             } else {
               promptFeedback = "Canceled deleting entry.".takeIf { promptFeedback.isBlank() } ?: promptFeedback
             }
+          }
+
+          // FILTER: filter based on a snippet of the category, nametag, or UUID
+          'f' -> {
+            // no supplemental options: reset all filters
+            if (opts.size == 1) {
+              filterCategory = ""
+              filterNametag = ""
+              filterUUID = ""
+              promptFeedback = "Filters reset."
+            } else {
+              val filterValue = "".takeUnless { opts.size >= 3 } ?: opts.subList(2, opts.size).joinToString(" ")
+              when (opts[1].lowercase()[0]) {
+                'c' -> filterCategory = filterValue
+                'n' -> filterNametag = filterValue
+                'u' -> filterUUID = filterValue
+                else -> promptFeedback = "Filter category, nametag, or UUID. e.g.: f c catname"
+              }
+            }
+            indexEntriesHere()
+            page = 1
           }
 
           // "HELP"
